@@ -1,7 +1,7 @@
 # Project Status
 
 ## Current phase
-**Phase 3 — verified structural baseline and background-node enrichment**
+**Phase 3 — node-enriched benchmark validation**
 
 ### Complete
 - Dataset selection: Elliptic2.
@@ -24,32 +24,34 @@
 - Exact identifiers locked in config: `ccId`, `ccLabel`, `clId`, `clId1`, `clId2`, `txId`.
 - Actual downloaded labels verified: 119,047 `licit` components and 2,763 `suspicious` components.
 - Labeled-universe integrity verified: zero missing source nodes, zero missing target nodes, and zero cross-component edges.
-- Labeled component size profile verified: both classes have median size 3 nodes; licit max 296 and suspicious max 30.
 - Structural feature store built from all 121,810 labeled components with 19 complete structural features and zero nulls.
 - First real-data structural baseline completed:
   - logistic regression average precision 0.026323 and ROC-AUC 0.545966;
   - random forest average precision 0.024107 and ROC-AUC 0.512885;
-  - held-out positive-class rate 0.022699.
-- Logistic regression achieved 1.8055x lift at the top 0.5% review budget (5 suspicious components in 122 reviews).
-- Structural-only results documented as the benchmark to beat; published paper metrics remain explicitly separate.
-- Investigator queue selection now defaults to the model with the best average precision instead of a hard-coded model.
-- 3D figure generation retained as the project standard; layout handling updated to avoid Matplotlib tight-layout warnings.
-- Background-node enrichment completed successfully on the 49.3M-row table:
-  - 444,521 labeled node rows and 444,521 distinct labeled nodes;
-  - 444,521 background matches and 444,521 distinct matched nodes;
+  - logistic regression achieved 1.8055x lift at the top 0.5% review budget (5 suspicious components in 122 reviews).
+- Background-node enrichment completed successfully:
+  - all 444,521 labeled nodes matched exactly once to the 49.3M-row background-node table;
   - zero missing labeled nodes and zero duplicate background matches;
   - all 43 node features aggregated by mean, population standard deviation, minimum, and maximum;
   - 172 component-level node-derived features created;
   - all 121,810 components retained, including all 2,763 positive components;
   - zero components without node-feature coverage.
+- First node-enriched single-split benchmark completed:
+  - logistic regression average precision 0.145578 and ROC-AUC 0.882008;
+  - random forest average precision 0.530556 and ROC-AUC 0.926611;
+  - random forest top-0.5% review budget: 117 suspicious components in 122 reviews, 95.90% precision, 21.16% recall, 42.25x lift;
+  - random forest top-1% review budget: 190 suspicious components in 244 reviews, 77.87% precision, 34.36% recall, 34.30x lift.
+- Investigator queue selection defaults to the model with the best average precision.
+- 3D visualization remains the project standard.
+- Repeated-split / leakage / calibration validation harness added at `src/validate_node_enriched_models.py`.
 
 ### Next
-- Regenerate the structural investigator queue / 3D figures using automatic best-model selection if not already done after the latest pull.
-- Train logistic regression and random forest on `data/derived/component_features_node_enriched.parquet` into a separate `results/node_enriched/` directory.
-- Build a separate node-enriched investigator queue and 3D figures.
-- Compare node-enriched PR-AUC, ROC-AUC, and review-budget lift directly against the structural-only baseline.
-- Add repeated splits or confidence intervals and calibration diagnostics before treating model performance as stable.
-- Add 95 background-edge feature aggregates in a separate resource-controlled experiment because it must scan the 196.2M-edge table.
-- Compare enriched baselines against published graph-model reference benchmarks.
+- Run `src/validate_node_enriched_models.py` on the node-enriched feature store.
+- Inspect repeated-split average precision, ROC-AUC, Brier score, and review-budget stability.
+- Confirm shuffled-label performance collapses toward the ~2.27% base rate.
+- Inspect `feature_class_separation.csv` and `feature_importance_seed42.csv` for excessive dominance or suspicious target-proxy behavior.
+- Review calibration tables before interpreting raw model probabilities as risk probabilities.
+- Only after these checks pass, build the 95 background-edge feature aggregates in a resource-controlled experiment over the 196.2M-edge table.
+- Compare edge-enriched results against the validated node-enriched benchmark and published graph-model references.
 - Add graph-native GLASS-style or equivalent benchmark when compute permits.
 - Produce portfolio-ready findings and 3D visuals only from verified, validated real-data outputs.
