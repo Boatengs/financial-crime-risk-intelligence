@@ -5,26 +5,53 @@ elliptic2:
     - connected_components.csv
     - edges.csv
     - nodes.csv
-  published_scale:
+
+  verified_scale:
     background_nodes: 49299864
     background_edges: 196215606
-    labeled_subgraphs: 121810
-    suspicious_subgraphs: 2763
-    licit_subgraphs: 119047
+    labeled_components: 121810
+    labeled_nodes: 444521
+    labeled_edges: 367137
     node_features: 43
     edge_features: 95
+
   verified_schema:
+    background_nodes:
+      cluster_id: clId
+      feature_prefix: "feat#"
+      feature_count: 43
     background_edges:
       source: clId1
       target: clId2
+      transaction_id: txId
+      feature_prefix: "feat#"
+      feature_count: 95
     connected_components:
+      component_id: ccId
       label: ccLabel
-      component_id_position: first_column
     nodes:
-      cluster_id_position: first_column
-      component_id_position: second_column
+      cluster_id: clId
+      component_id: ccId
+    edges:
+      source: clId1
+      target: clId2
+      transaction_id: txId
+
+  label_mapping:
+    positive:
+      - illicit
+      - suspicious
+      - "1"
+      - "true"
+    negative:
+      - licit
+      - non-suspicious
+      - nonsuspicious
+      - "0"
+      - "false"
+
 notes:
-  - The five-file layout and positional mappings above are verified against the official MITIBMxGraph/Elliptic2 preprocessing code.
-  - Raw feature names are anonymized/binned by the dataset provider.
-  - Exact downloaded headers and inferred data types must still be captured in the schema manifest before full processing.
-  - The paper reports 43 node features and 95 edge features; do not substitute counts from third-party implementations without verification.
+  - Row counts and exact headers above were verified against the locally downloaded Elliptic2 release on 2026-08-31.
+  - The labeled files carry component membership and labels; the 43 node features and 95 edge features live in the background files.
+  - Production feature extraction should join the small labeled universe to the large background tables and aggregate only relevant rows.
+  - Raw features are anonymized/binned by the dataset provider; no semantic meaning should be assigned to feat# columns without source documentation.
