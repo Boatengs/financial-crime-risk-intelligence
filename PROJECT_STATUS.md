@@ -25,7 +25,7 @@
 - Actual downloaded labels verified: 119,047 `licit` components and 2,763 `suspicious` components.
 - Labeled-universe integrity verified: zero missing source nodes, zero missing target nodes, and zero cross-component edges.
 - Labeled component size profile verified: both classes have median size 3 nodes; licit max 296 and suspicious max 30.
-- Structural feature store built from all 121,810 labeled components.
+- Structural feature store built from all 121,810 labeled components with 19 complete structural features and zero nulls.
 - First real-data structural baseline completed:
   - logistic regression average precision 0.026323 and ROC-AUC 0.545966;
   - random forest average precision 0.024107 and ROC-AUC 0.512885;
@@ -34,13 +34,19 @@
 - Structural-only results documented as the benchmark to beat; published paper metrics remain explicitly separate.
 - Investigator queue selection now defaults to the model with the best average precision instead of a hard-coded model.
 - 3D figure generation retained as the project standard; layout handling updated to avoid Matplotlib tight-layout warnings.
-- Out-of-core background-node enrichment script added. It scans the 49.3M-row background node table once, retains the 444,521 labeled nodes, validates match integrity, and creates 172 component-level aggregates from all 43 node features.
+- Background-node enrichment completed successfully on the 49.3M-row table:
+  - 444,521 labeled node rows and 444,521 distinct labeled nodes;
+  - 444,521 background matches and 444,521 distinct matched nodes;
+  - zero missing labeled nodes and zero duplicate background matches;
+  - all 43 node features aggregated by mean, population standard deviation, minimum, and maximum;
+  - 172 component-level node-derived features created;
+  - all 121,810 components retained, including all 2,763 positive components;
+  - zero components without node-feature coverage.
 
 ### Next
-- Pull the latest repository changes and regenerate the structural investigator queue / 3D figures using automatic best-model selection.
-- Run `src/enrich_node_features.py --raw-dir data/raw/elliptic2` locally.
-- Inspect `results/node_feature_enrichment_profile.json` before model fitting.
-- Train logistic regression and random forest on `data/derived/component_features_node_enriched.parquet` into a separate results directory.
+- Regenerate the structural investigator queue / 3D figures using automatic best-model selection if not already done after the latest pull.
+- Train logistic regression and random forest on `data/derived/component_features_node_enriched.parquet` into a separate `results/node_enriched/` directory.
+- Build a separate node-enriched investigator queue and 3D figures.
 - Compare node-enriched PR-AUC, ROC-AUC, and review-budget lift directly against the structural-only baseline.
 - Add repeated splits or confidence intervals and calibration diagnostics before treating model performance as stable.
 - Add 95 background-edge feature aggregates in a separate resource-controlled experiment because it must scan the 196.2M-edge table.
