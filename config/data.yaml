@@ -37,10 +37,16 @@ elliptic2:
       target: clId2
       transaction_id: txId
 
+  verified_release_labels:
+    positive: suspicious
+    negative: licit
+    positive_components: 2763
+    negative_components: 119047
+
   label_mapping:
     positive:
-      - illicit
       - suspicious
+      - illicit
       - "1"
       - "true"
     negative:
@@ -51,7 +57,8 @@ elliptic2:
       - "false"
 
 notes:
-  - Row counts and exact headers above were verified against the locally downloaded Elliptic2 release on 2026-08-31.
+  - Row counts, exact headers, and actual ccLabel values above were verified against the locally downloaded Elliptic2 release on 2026-08-31.
   - The labeled files carry component membership and labels; the 43 node features and 95 edge features live in the background files.
+  - Labeled-edge integrity profiling found zero missing source nodes, zero missing target nodes, and zero cross-component edges.
   - Production feature extraction should join the small labeled universe to the large background tables and aggregate only relevant rows.
   - Raw features are anonymized/binned by the dataset provider; no semantic meaning should be assigned to feat# columns without source documentation.
