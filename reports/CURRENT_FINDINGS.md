@@ -1,13 +1,12 @@
 # Current Findings
 
-## First verified real-data baseline: structural features only
+## Verified structural baseline
 
-The repository has now been run on the official locally downloaded Elliptic2 labeled universe. These are **project results**, not synthetic fixture metrics and not published-paper metrics.
+The repository has been run on the official locally downloaded Elliptic2 labeled universe. These are **project results**, not synthetic fixture metrics and not published-paper metrics.
 
 ### Evaluation setup
 - 121,810 labeled connected components.
 - 119,047 licit and 2,763 suspicious components.
-- Structural component features only; the 43 background-node features and 95 background-edge features are not included in this baseline.
 - Stratified 80/20 train/test split with random state 42.
 - Positive-class rate in the held-out test set: 0.0226993 (about 2.27%).
 - Primary global metric: average precision / PR-AUC because of the severe class imbalance.
@@ -28,36 +27,56 @@ The class-level structural summaries are notably similar:
 | Average source nodes | 1.0644 | 1.0575 |
 | Average sink nodes | 1.1700 | 1.1922 |
 
-Suspicious components are slightly larger on average but do not exhibit a large separation from licit components on these basic topology measures. The structural overlap is consistent with the weak discrimination observed in the baseline models and strengthens the case for testing the anonymized node and edge features as incremental sources of signal.
+Suspicious components are slightly larger on average but do not exhibit a large separation from licit components on these basic topology measures.
 
-### Global discrimination
+### Structural-only discrimination
 
 | Model | Average precision | ROC-AUC | Test base rate |
 |---|---:|---:|---:|
 | Logistic regression | 0.0263 | 0.5460 | 0.0227 |
 | Random forest | 0.0241 | 0.5129 | 0.0227 |
 
-The structural-only signal is weak. Logistic regression is the stronger baseline, but its average precision is only modestly above the 2.27% positive-class prevalence. Random forest is close to random discrimination on this feature set.
+For the stronger structural logistic model, the top 0.5% review budget captured 5 suspicious components in 122 reviews, with 4.10% precision and 1.81x lift versus random review.
 
-### Investigator-budget behavior
+The structural-only signal is weak and serves as the benchmark to beat.
 
-For logistic regression:
+## Provisional node-enriched benchmark
 
-| Review budget | Reviews | Suspicious captured | Precision | Recall | Lift vs random |
-|---|---:|---:|---:|---:|---:|
-| 0.5% | 122 | 5 | 4.10% | 0.90% | 1.81x |
-| 1% | 244 | 9 | 3.69% | 1.63% | 1.62x |
-| 2% | 488 | 17 | 3.48% | 3.07% | 1.53x |
-| 5% | 1,219 | 42 | 3.45% | 7.59% | 1.52x |
-| 10% | 2,437 | 70 | 2.87% | 12.66% | 1.27x |
+The 49.3M-row background-node table was joined out-of-core to the 444,521 labeled nodes with perfect match integrity:
+- 444,521 distinct labeled nodes matched exactly once;
+- zero missing labeled nodes;
+- zero duplicate background matches;
+- all 43 anonymized node features were aggregated by mean, population standard deviation, minimum, and maximum;
+- 172 node-derived component features were added;
+- all 121,810 components and all 2,763 suspicious labels were retained.
 
-The best observed lift occurs at the smallest review budget, but the absolute number of suspicious components captured is small. This result is useful as an operational baseline, not as evidence that structural features alone are sufficient for AML prioritization.
+Using the same 80/20 split and modeling framework, the first node-enriched run produced:
+
+| Model | Average precision | ROC-AUC | Test base rate |
+|---|---:|---:|---:|
+| Logistic regression | 0.1456 | 0.8820 | 0.0227 |
+| Random forest | 0.5306 | 0.9266 | 0.0227 |
+
+The random forest result is dramatically stronger than the structural baseline. At the top 0.5% review budget it captured 117 suspicious components in 122 reviews, corresponding to 95.90% precision, 21.16% recall, and 42.25x lift versus random review. At the top 1% it captured 190 suspicious components in 244 reviews, with 77.87% precision and 34.36% recall.
+
+### Validation status
+
+These node-enriched metrics are **provisional until stress-tested**. The magnitude of the improvement is large enough that the project will not treat the single-split result as portfolio-grade evidence yet.
+
+Before adding the 95 edge features or publishing headline claims, the repository requires:
+1. repeated stratified train/test splits across multiple seeds;
+2. a shuffled-label sanity check that should collapse performance toward the class prevalence;
+3. feature-name and feature-value leakage audits;
+4. feature-stability / dominant-feature inspection;
+5. calibration diagnostics and review-budget stability across splits.
+
+`src/validate_node_enriched_models.py` implements this validation stage and writes all outputs to `results/node_enriched_validation/`.
 
 ### Current interpretation
-1. Basic connected-component structure contains limited but measurable risk signal.
-2. The class-level structural summaries overlap heavily, which helps explain why structure alone performs poorly.
-3. The weak global performance creates a credible benchmark for testing the value of the 43 anonymized node features and later the 95 edge features.
-4. The next experiment should hold the split/model/evaluation framework stable and enrich only the feature set so the incremental value of node features can be measured directly.
+1. Basic connected-component structure contains limited risk signal.
+2. The anonymized node features appear to contain substantial incremental signal, especially for the nonlinear random-forest model.
+3. The random-forest gain is large enough that validation is now more important than immediately adding more features.
+4. If repeated-split and permutation checks confirm the signal, the node-enriched model becomes the primary benchmark for the later 95-edge-feature experiment.
 5. Scores are research prioritization signals only. They do not establish criminal activity, make legal determinations, or automate regulatory reporting.
 
-No portfolio-level claim should be made from this structural-only baseline alone.
+No final portfolio claim should be made from the single-split node-enriched result alone.
