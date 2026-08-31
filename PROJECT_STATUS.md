@@ -6,10 +6,11 @@
 ### Complete
 - Dataset selection: Elliptic2.
 - Decision framing: investigator prioritization under review constraints.
-- Repository architecture.
+- Repository architecture pushed to `main`.
 - Synthetic smoke-test fixture.
 - Baseline feature engineering, modeling, and review-budget evaluation code.
 - Data-source and licensing register.
+- Local smoke test: unit tests and fixture pipeline pass.
 
 ### Next
 - Download and schema-profile the official Elliptic2 release.
