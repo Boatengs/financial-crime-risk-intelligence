@@ -1,0 +1,16 @@
+elliptic2:
+  expected_files:
+    - background_edges.csv
+    - background_nodes.csv
+    - connected_components.csv
+    - edges.csv
+    - nodes.csv
+  known_columns:
+    background_edges:
+      source: clId1
+      target: clId2
+    connected_components:
+      label: ccLabel
+notes:
+  - Raw feature columns are anonymized/binned by the dataset provider.
+  - Field mappings should be validated against the downloaded release before full processing.

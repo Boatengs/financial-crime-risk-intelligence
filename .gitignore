@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Large/raw data
+/data/raw/*
+!/data/raw/.gitkeep
+/data/processed/*
+!/data/processed/.gitkeep
+/data/derived/*
+!/data/derived/.gitkeep
+*.duckdb
+*.parquet
+
+# Generated outputs
+/results/*.csv
+/results/*.json
+/figures/*.svg
+/figures/*.png
+
+# Local env
+.env
+.DS_Store

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "financial-crime-risk-intelligence"
+version = "0.1.0"
+description = "Scalable graph analytics and investigator prioritization for anti-money-laundering risk intelligence."
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26",
+  "pandas>=2.1",
+  "pyarrow>=15",
+  "duckdb>=1.0",
+  "scikit-learn>=1.4",
+  "pyyaml>=6.0",
+  "matplotlib>=3.8",
+  "networkx>=3.2",
+]
+
+[project.optional-dependencies]
+graph = [
+  "torch>=2.2",
+  "torch-geometric>=2.5",
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100

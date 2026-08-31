@@ -1,0 +1,17 @@
+random_seed: 42
+test_size: 0.20
+primary_metric: average_precision
+models:
+  logistic_regression:
+    class_weight: balanced
+    max_iter: 2000
+  random_forest:
+    n_estimators: 400
+    class_weight: balanced_subsample
+    min_samples_leaf: 2
+review_budgets:
+  fractions: [0.005, 0.01, 0.02, 0.05, 0.10]
+risk_bands:
+  critical: 0.90
+  high: 0.75
+  elevated: 0.50
