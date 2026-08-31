@@ -5,12 +5,26 @@ elliptic2:
     - connected_components.csv
     - edges.csv
     - nodes.csv
-  known_columns:
+  published_scale:
+    background_nodes: 49299864
+    background_edges: 196215606
+    labeled_subgraphs: 121810
+    suspicious_subgraphs: 2763
+    licit_subgraphs: 119047
+    node_features: 43
+    edge_features: 95
+  verified_schema:
     background_edges:
       source: clId1
       target: clId2
     connected_components:
       label: ccLabel
+      component_id_position: first_column
+    nodes:
+      cluster_id_position: first_column
+      component_id_position: second_column
 notes:
-  - Raw feature columns are anonymized/binned by the dataset provider.
-  - Field mappings should be validated against the downloaded release before full processing.
+  - The five-file layout and positional mappings above are verified against the official MITIBMxGraph/Elliptic2 preprocessing code.
+  - Raw feature names are anonymized/binned by the dataset provider.
+  - Exact downloaded headers and inferred data types must still be captured in the schema manifest before full processing.
+  - The paper reports 43 node features and 95 edge features; do not substitute counts from third-party implementations without verification.
