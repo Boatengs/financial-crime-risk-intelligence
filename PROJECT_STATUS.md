@@ -1,7 +1,7 @@
 # Project Status
 
 ## Current phase
-**Phase 2 — verified labeled universe and structural baseline preparation**
+**Phase 3 — verified structural baseline and background-node enrichment**
 
 ### Complete
 - Dataset selection: Elliptic2.
@@ -25,16 +25,25 @@
 - Actual downloaded labels verified: 119,047 `licit` components and 2,763 `suspicious` components.
 - Labeled-universe integrity verified: zero missing source nodes, zero missing target nodes, and zero cross-component edges.
 - Labeled component size profile verified: both classes have median size 3 nodes; licit max 296 and suspicious max 30.
-- Structural component feature store uses the verified schema and out-of-core DuckDB processing.
-- Compact structural feature-store profiler added so large Parquet outputs do not need to be shared.
-- Visualization requirement set to 3D by default; current figure generator produces 3D review-budget and investigator-queue views.
+- Structural feature store built from all 121,810 labeled components.
+- First real-data structural baseline completed:
+  - logistic regression average precision 0.026323 and ROC-AUC 0.545966;
+  - random forest average precision 0.024107 and ROC-AUC 0.512885;
+  - held-out positive-class rate 0.022699.
+- Logistic regression achieved 1.8055x lift at the top 0.5% review budget (5 suspicious components in 122 reviews).
+- Structural-only results documented as the benchmark to beat; published paper metrics remain explicitly separate.
+- Investigator queue selection now defaults to the model with the best average precision instead of a hard-coded model.
+- 3D figure generation retained as the project standard; layout handling updated to avoid Matplotlib tight-layout warnings.
+- Out-of-core background-node enrichment script added. It scans the 49.3M-row background node table once, retains the 444,521 labeled nodes, validates match integrity, and creates 172 component-level aggregates from all 43 node features.
 
 ### Next
-- Build the structural component feature store from all 121,810 labeled components.
-- Run `src/profile_feature_store.py` and validate feature completeness / class counts.
-- Train first real-data explainable baselines and capture PR-AUC / review-budget lift.
-- Add background-node feature aggregates by joining the 444,521 labeled nodes to the 49.3M-node background table.
-- Add background-edge feature aggregates in a separate staged job because it must scan the 196.2M-edge table and 95 feature columns.
-- Compare enriched baselines against the published graph-model reference benchmarks.
+- Pull the latest repository changes and regenerate the structural investigator queue / 3D figures using automatic best-model selection.
+- Run `src/enrich_node_features.py --raw-dir data/raw/elliptic2` locally.
+- Inspect `results/node_feature_enrichment_profile.json` before model fitting.
+- Train logistic regression and random forest on `data/derived/component_features_node_enriched.parquet` into a separate results directory.
+- Compare node-enriched PR-AUC, ROC-AUC, and review-budget lift directly against the structural-only baseline.
+- Add repeated splits or confidence intervals and calibration diagnostics before treating model performance as stable.
+- Add 95 background-edge feature aggregates in a separate resource-controlled experiment because it must scan the 196.2M-edge table.
+- Compare enriched baselines against published graph-model reference benchmarks.
 - Add graph-native GLASS-style or equivalent benchmark when compute permits.
-- Produce portfolio-ready findings and 3D visuals only from verified full-data outputs.
+- Produce portfolio-ready findings and 3D visuals only from verified, validated real-data outputs.
