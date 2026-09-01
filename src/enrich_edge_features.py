@@ -182,7 +182,12 @@ def main():
             aggregate_aliases.append(alias)
 
     aggregate_sql = ",\n               ".join(aggregate_exprs)
-    enriched_columns = ",\n        ".join(f"a.{ident(c)}" for c in aggregate_aliases)
+    # Components without matched edges keep an explicit coverage count of zero;
+    # their edge-derived numeric features are zero-filled so downstream sklearn
+    # baselines receive a complete numeric matrix rather than NaNs.
+    enriched_columns = ",\n        ".join(
+        f"coalesce(a.{ident(c)}, 0) AS {ident(c)}" for c in aggregate_aliases
+    )
 
     query = f"""
     COPY (
@@ -217,8 +222,7 @@ def main():
         f"""
         SELECT count(*)
         FROM read_parquet('{output.as_posix()}')
-        WHERE matched_edge_count > 0
-          AND edge_feat_01_mean IS NULL
+        WHERE edge_feat_01_mean IS NULL
         """
     ).fetchone()[0]
 
@@ -227,7 +231,7 @@ def main():
             "output_component_rows": int(output_rows),
             "positive_component_rows": int(positives or 0),
             "components_without_edge_features": int(components_without_edge_features),
-            "matched_components_with_null_edge_aggregates": int(null_aggregate_rows),
+            "rows_with_null_edge_aggregates": int(null_aggregate_rows),
             "output": output.as_posix(),
         }
     )
