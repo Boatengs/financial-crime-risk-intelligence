@@ -89,18 +89,9 @@ Feature-importance concentration is not excessive. The largest random-forest fea
 
 The strongest class-separation signals are concentrated around anonymized node features 28 and 29. `node_feat_29_max`, `node_feat_29_sd`, and `node_feat_29_mean` have standardized mean differences of about 1.23, 1.21, and 1.21 respectively. Because the source variables are anonymized, these patterns can be described quantitatively but should not be assigned unsupported semantic meaning.
 
-### Current interpretation
-1. Basic connected-component structure contains limited risk signal.
-2. The anonymized node features add substantial and repeatable predictive signal, especially for the nonlinear random forest.
-3. Random-forest PR-AUC is stable around 0.528 across five splits, and review-budget lift remains very high at constrained investigator capacity.
-4. Shuffled-label performance collapses to chance, schema leakage checks pass, and no single feature dominates the forest.
-5. The validated node-enriched random forest is the primary project benchmark for the edge-feature experiment.
-6. Raw model scores remain ranking signals rather than calibrated probabilities until calibration is explicitly validated.
-7. Scores do not establish criminal activity, make legal determinations, or automate regulatory reporting.
+## Edge-feature enrichment
 
-## Edge-feature enrichment: engineering validation complete
-
-The 367,137 labeled edges were matched against the 196,215,606-row background-edge table using the full `(clId1, clId2, txId)` key. The audit passed exactly:
+The 367,137 labeled edges were matched against the 196,215,606-row background-edge table using the full `(clId1, clId2, txId)` key. Match integrity passed exactly:
 - 367,137 labeled edge rows and 367,137 distinct labeled edge keys;
 - zero duplicate labeled edge keys;
 - zero missing component IDs;
@@ -110,6 +101,37 @@ The 367,137 labeled edges were matched against the 196,215,606-row background-ed
 
 All 95 anonymized edge features were aggregated by mean, population standard deviation, minimum, and maximum, yielding 380 component-level edge-derived features. The node+edge feature store retains all 121,810 components and all 2,763 suspicious labels, with zero components lacking edge-feature coverage and zero null edge aggregates.
 
-This means the edge-enriched dataset is technically valid for modeling. The next question is not data integrity but incremental value: whether the 380 edge-derived features improve PR-AUC and constrained-review lift beyond the validated node benchmark, or simply add model complexity.
+### Initial node+edge benchmark
 
-No edge-enriched performance claim is reported yet.
+On the same seed-42 80/20 split used for the node benchmark:
+
+| Model | Node-only PR-AUC | Node+edge PR-AUC | Node-only ROC-AUC | Node+edge ROC-AUC |
+|---|---:|---:|---:|---:|
+| Logistic regression | 0.1456 | 0.1513 | 0.8820 | 0.8732 |
+| Random forest | 0.5306 | 0.4877 | 0.9266 | 0.9254 |
+
+The combined edge features slightly improve logistic-regression PR-AUC but reduce its ROC-AUC. More importantly, the winning random forest becomes worse on the primary metric: PR-AUC falls by about 0.0429 absolute (roughly 8% relative) while ROC-AUC remains essentially flat.
+
+For the random forest, investigator-budget performance also weakens:
+
+| Review budget | Node-only suspicious captured | Node+edge suspicious captured | Node-only precision | Node+edge precision | Node-only lift | Node+edge lift |
+|---|---:|---:|---:|---:|---:|---:|
+| 0.5% | 117 | 114 | 95.90% | 93.44% | 42.25x | 41.17x |
+| 1% | 190 | 176 | 77.87% | 72.13% | 34.30x | 31.78x |
+| 2% | 262 | 242 | 53.69% | 49.59% | 23.65x | 21.85x |
+| 5% | 357 | 339 | 29.29% | 27.81% | 12.90x | 12.25x |
+| 10% | 421 | 420 | 17.28% | 17.23% | 7.61x | 7.59x |
+
+This is a meaningful negative incremental-value finding: the expensive 95-edge-feature enrichment is technically sound but does not improve the strongest model on the matched split. The validated node-only random forest therefore remains the preferred operational benchmark unless repeated-split validation shows a materially different pattern.
+
+### Current interpretation
+1. Basic connected-component structure contains limited risk signal.
+2. The anonymized node features add substantial and repeatable predictive signal, especially for the nonlinear random forest.
+3. Random-forest PR-AUC is stable around 0.528 across five node-only splits, with strong constrained-review lift.
+4. Shuffled-label performance collapses to chance, schema leakage checks pass, and no single node feature dominates the forest.
+5. Adding 380 edge-derived aggregates increases dimensionality and engineering cost but reduces seed-42 random-forest PR-AUC and low-budget capture.
+6. The node-only random forest is currently the preferred model because it is both simpler and better on the primary operational metrics.
+7. Raw model scores remain ranking signals rather than calibrated probabilities until calibration is explicitly validated.
+8. Scores do not establish criminal activity, make legal determinations, or automate regulatory reporting.
+
+The next validation step is to repeat the node+edge benchmark across the same five seeds. If the degradation persists, the project should retain the node-only model and present the edge experiment as evidence that more features do not necessarily create more decision value.
