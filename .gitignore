@@ -17,10 +17,11 @@ venv/
 *.parquet
 
 # Generated outputs
-/results/*.csv
-/results/*.json
-/figures/*.svg
-/figures/*.png
+/results/**/*.csv
+/results/**/*.json
+/figures/**/*.svg
+/figures/**/*.png
+/figures/**/*.html
 
 # Local env
 .env
