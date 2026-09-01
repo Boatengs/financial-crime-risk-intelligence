@@ -65,7 +65,7 @@ For the random forest:
 | 5% | 29.17% | 64.30% | 12.85x | 355.6 | 347–362 |
 | 10% | 17.42% | 76.78% | 7.68x | 424.6 | 419–438 |
 
-The high-lift queue behavior is therefore operationally stable across the tested random splits.
+The high-lift queue behavior is operationally stable across the tested random splits.
 
 ### Shuffled-label sanity check
 
@@ -78,12 +78,26 @@ Training labels were permuted while the held-out test labels remained real. Perf
 
 This collapse toward prevalence / chance discrimination is strong evidence that the validated node-enriched performance depends on the real feature-label relationship rather than surviving arbitrary labels.
 
+### Final validation gate
+
+The compact validation gate reports `hard_checks_pass`:
+- repeated-split stability: pass;
+- permutation sanity: pass;
+- schema leakage audit: pass.
+
+Feature-importance concentration is not excessive. The largest random-forest feature, `node_feat_28_max`, contributes about 5.20% of total importance, while the top 10 features together contribute about 38.46%. The gate therefore does not recommend manual leakage review based on feature dominance.
+
+The strongest class-separation signals are concentrated around anonymized node features 28 and 29. `node_feat_29_max`, `node_feat_29_sd`, and `node_feat_29_mean` have standardized mean differences of about 1.23, 1.21, and 1.21 respectively. Because the source variables are anonymized, these patterns can be described quantitatively but should not be assigned unsupported semantic meaning.
+
 ### Current interpretation
 1. Basic connected-component structure contains limited risk signal.
-2. The anonymized node features add substantial, repeatable predictive signal, especially for the nonlinear random forest.
-3. Random-forest PR-AUC is stable around 0.528 across five splits and review-budget lift remains very high at constrained investigator capacity.
-4. The shuffled-label sanity check behaves correctly, materially increasing confidence in the result.
-5. A final feature-dominance / target-proxy review remains appropriate because the node features are anonymized and the performance gain is large.
-6. Raw scores remain research prioritization signals. They do not establish criminal activity, make legal determinations, or automate regulatory reporting.
+2. The anonymized node features add substantial and repeatable predictive signal, especially for the nonlinear random forest.
+3. Random-forest PR-AUC is stable around 0.528 across five splits, and review-budget lift remains very high at constrained investigator capacity.
+4. Shuffled-label performance collapses to chance, schema leakage checks pass, and no single feature dominates the forest.
+5. The validated node-enriched random forest is now the primary project benchmark for the 95-edge-feature experiment.
+6. Raw model scores remain ranking signals rather than calibrated probabilities until calibration is explicitly validated.
+7. Scores do not establish criminal activity, make legal determinations, or automate regulatory reporting.
 
-The validated node-enriched random forest is now the primary project benchmark for the later 95-edge-feature experiment, subject to the final feature-dominance audit.
+## Next experiment: edge-feature enrichment
+
+The next stage matches the 367,137 labeled edges to the 196,215,606-row background-edge table using the full `(clId1, clId2, txId)` key. All 95 anonymized edge features will be aggregated by mean, population standard deviation, minimum, and maximum, producing 380 component-level edge-derived features. Match integrity must pass before any edge-enriched model is trained.
