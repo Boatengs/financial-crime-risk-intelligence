@@ -1,105 +1,239 @@
 # Financial Crime Risk Intelligence
 
-**Elliptic2 blockchain AML → scalable graph ingestion → laundering-pattern detection → explainable alert scoring → investigator queue → workload trade-offs**
+**Elliptic2 blockchain AML → scalable feature engineering → constrained-review model selection → calibrated decision support → investigator evidence**
 
-This project is designed as an investigator-oriented anti-money-laundering (AML) analytics system rather than a one-off fraud classifier. The primary benchmark is **Elliptic2**, a large public financial-crime graph dataset containing roughly **49.3M node clusters, 196.2M transaction edges, and 121,810 labeled subgraphs**, of which only **2,763 are suspicious**. The labels are at the subgraph level, which makes the problem closer to real AML case triage than row-level transaction classification.
-
-> The project does **not** redistribute Elliptic2. Download the dataset from its original Kaggle source and follow its CC BY-NC-ND 4.0 license.
-
-## Decision question
+Financial Crime Risk Intelligence is an investigator-oriented anti-money-laundering analytics project built on the public **Elliptic2** transaction graph. The project asks a practical question:
 
 > Given a very large, highly imbalanced transaction network, which connected transaction patterns should investigators review first, why were they prioritized, and how much suspicious activity can be captured under a constrained review budget?
 
-## Why this is difficult
+The project is intentionally framed as **research decision support**, not automated enforcement. Scores prioritize human review; they do not establish criminal activity, make legal determinations, or automate regulatory reporting.
 
-- **Scale:** the full background graph is tens of millions of entities and hundreds of millions of directed edges.
-- **Graph structure:** laundering behavior is expressed through multi-transaction patterns, not isolated rows.
-- **Class imbalance:** suspicious subgraphs are only about 2.27% of the labeled population.
-- **Operational objective:** investigators cannot review every alert, so model quality must be measured at realistic review budgets.
-- **Explainability:** a useful alert must show its structural and feature-level reasons, not only a probability.
+## Verified data scale
 
-## Architecture
+The locally downloaded Elliptic2 release used in this project contains:
+
+| Table | Verified rows |
+|---|---:|
+| Background nodes | 49,299,864 |
+| Background transaction edges | 196,215,606 |
+| Labeled connected components | 121,810 |
+| Labeled nodes | 444,521 |
+| Labeled edges | 367,137 |
+
+The labeled universe contains **119,047 licit** and **2,763 suspicious** connected components, so suspicious cases represent only about **2.27%** of the labeled population.
+
+> The repository does **not** redistribute Elliptic2. Download the dataset from its original Kaggle source and follow its license terms.
+
+## What the project demonstrates
+
+### 1. Structure alone is not enough
+
+A 19-feature structural benchmark using connected-component topology performed only slightly above random:
+
+| Structural model | PR-AUC | ROC-AUC |
+|---|---:|---:|
+| Logistic regression | 0.0263 | 0.5460 |
+| Random forest | 0.0241 | 0.5129 |
+
+This establishes a deliberately weak baseline: graph size, degree, density, and related topology alone do not provide enough prioritization signal.
+
+### 2. Node features create the dominant signal
+
+All **444,521 labeled nodes** matched exactly once to the 49.3M-row background-node table. The 43 anonymized node features were aggregated by mean, population standard deviation, minimum, and maximum, adding **172 component-level node features** with zero missing labeled nodes and zero duplicate background matches.
+
+Across five stratified 80/20 splits, the preferred **node-enriched random forest** produced:
+
+| Validation measure | Result |
+|---|---:|
+| Mean PR-AUC | **0.5279** |
+| PR-AUC SD | **0.0081** |
+| Mean ROC-AUC | **0.9278** |
+| Mean Brier score | **0.0150** |
+| Shuffled-label PR-AUC | **0.0210** |
+| Test prevalence | **0.0227** |
+
+The shuffled-label sanity check collapsed to chance-level performance, while schema-leakage and feature-dominance checks passed.
+
+### 3. The investigator queue remains strong under tight review budgets
+
+The project evaluates the model where AML work is actually constrained: the number of cases an investigator team can review.
+
+| Review budget | Mean precision | Mean recall | Mean lift | Mean suspicious captured |
+|---|---:|---:|---:|---:|
+| Top 0.5% | **94.26%** | 20.80% | **41.53×** | **115.0** |
+| Top 1% | 77.38% | 34.14% | 34.09× | 188.8 |
+| Top 2% | 53.65% | 47.34% | 23.63× | 261.8 |
+| Top 5% | 29.17% | 64.30% | 12.85× | 355.6 |
+| Top 10% | 17.42% | 76.78% | 7.68× | 424.6 |
+
+At the tightest tested operating point, roughly **115 suspicious components are captured in about 122 reviews on average** across the five validation splits.
+
+### 4. More features did not automatically create more decision value
+
+The **367,137 labeled edges** were matched exactly against the 196.2M-row background-edge table using the full `(clId1, clId2, txId)` key. All 95 anonymized edge features were aggregated into **380 additional component-level features** with zero missing labeled edges, zero duplicate matches, and zero null edge aggregates.
+
+Despite that substantial engineering effort, the combined node+edge random forest performed worse:
+
+| Random forest | Node only | Node + edge |
+|---|---:|---:|
+| Mean PR-AUC | **0.5279** | 0.5022 |
+| PR-AUC SD | **0.0081** | 0.0171 |
+| Mean ROC-AUC | **0.9278** | 0.9247 |
+| Mean Brier score | **0.0150** | 0.0157 |
+
+The node+edge model is essentially tied at the top 0.5% review point and worse from 1% through 10%. The project therefore keeps the **node-enriched random forest** as the preferred model and treats the edge experiment as a validated negative incremental-value result.
+
+### 5. Ranking and probability are treated as different products
+
+The raw random-forest output is retained as an **investigator ranking score**, not presented as a literal suspicious-activity probability.
+
+A strict 60/20/20 train/calibration/test experiment compared raw, sigmoid, and isotonic scores:
+
+| Method | PR-AUC | Brier | Log loss | ECE |
+|---|---:|---:|---:|---:|
+| Raw random forest | 0.5074 | 0.01534 | 0.07255 | 0.00881 |
+| Sigmoid calibration | **0.5074** | 0.01533 | 0.06866 | **0.00272** |
+| Isotonic calibration | 0.4813 | **0.01516** | **0.06521** | **0.00139** |
+
+Sigmoid calibration preserves the ranking exactly while materially improving ECE and log loss, so it may be used as an **optional research probability estimate**. Isotonic calibration is not selected for operational ranking because it degrades PR-AUC and the smallest-budget capture.
+
+## Investigator-facing evidence
+
+The queue uses review-capacity tiers instead of arbitrary probability-like cutoffs:
+
+- top 0.5%,
+- 0.5–1%,
+- 1–2%,
+- 2–5%,
+- 5–10%,
+- standard.
+
+Each queued component can be enriched with three case-specific statistical review cues. The evidence layer:
+
+1. starts from the globally important random-forest node features;
+2. measures each queued component's percentile and standardized deviation for those features;
+3. ranks candidate cues using `global feature importance × absolute standardized deviation`;
+4. reports the feature value, percentile, z-score direction, and global importance.
+
+The source features are anonymized, so the project does **not** invent semantic meanings for them. These cues describe unusual model-relevant measurements; they are not causal explanations or proof of suspicious activity.
+
+A verified explained queue contains **24,362 held-out components** and **73,086 structured evidence rows**—exactly three cues per queued component.
+
+## End-to-end architecture
 
 ```text
 Elliptic2 raw CSVs
     |
-    v
-src/inspect_elliptic2.py
-    | schema + row-count manifest
-    v
-src/build_feature_store.py
-    | component-level graph + feature aggregates
-    v
-src/train_baselines.py
-    | logistic regression + random forest baselines
-    | PR-AUC + precision/recall/lift @ review budget
-    v
-src/build_investigator_queue.py
-    | prioritized cases + review context
-    v
-src/generate_figures.py
-    | executive risk + workload views
-    v
-reports/ and results/
+    +--> inspect/profile schema and labeled-universe integrity
+    |
+    +--> build structural component features
+    |
+    +--> out-of-core node enrichment (49.3M background nodes)
+    |       |
+    |       +--> logistic regression + random forest
+    |       +--> repeated-split / permutation / leakage validation
+    |       +--> preferred node-only random forest
+    |
+    +--> out-of-core edge enrichment (196.2M background edges)
+    |       |
+    |       +--> node+edge ablation
+    |       +--> rejected for incremental operational value
+    |
+    +--> held-out calibration comparison
+    |
+    +--> capacity-ranked investigator queue
+    |
+    +--> case-specific statistical evidence
+    |
+    +--> Seaborn static + Plotly interactive decision views
 ```
 
-An optional graph-learning track can benchmark subgraph models such as GLASS/GNNSeg against the tabular/structural baselines, but the repository keeps the operational analytics layer independent of any single model family.
+## Key repository outputs
 
-## Primary outputs
+- `reports/CURRENT_FINDINGS.md` — verified project findings
+- `reports/MODEL_VALIDATION.md` — model-validation framing
+- `reports/CALIBRATION_DECISION.md` — ranking vs probability decision
+- `PROJECT_STATUS.md` — current project state
+- `results/node_enriched/` — preferred single-split benchmark outputs
+- `results/node_enriched_validation/` — repeated validation and leakage checks
+- `results/node_calibration/` — calibration comparison outputs
+- `results/node_edge_enriched_validation/` — edge-feature ablation
+- `results/node_enriched/investigator_queue_explained.csv` — investigator-facing queue with case evidence
+- `results/node_enriched/investigator_evidence_long.csv` — structured evidence for analysis and visualization
 
-- `results/model_metrics.csv`
-- `results/review_budget_metrics.csv`
-- `results/investigator_queue.csv`
-- `figures/review_budget_curve.svg`
-- `figures/risk_queue_summary.svg`
-- `reports/CURRENT_FINDINGS.md`
-- `reports/MODEL_VALIDATION.md`
-- `reports/INVESTIGATOR_WORKFLOW.md`
+Generated result files and figures are intentionally ignored by Git; the code needed to reproduce them is versioned.
 
-## Fast local smoke test
+## Visualization standard
 
-The repository includes a small synthetic fixture so the pipeline logic can be tested without downloading the full dataset.
+Project visualizations are standard **2D Seaborn and Plotly** charts:
+
+- Seaborn → presentation-ready static `.png` figures
+- Plotly → interactive `.html` counterparts with hover and zoom
+
+Current figure generators cover:
+
+- review-budget lift and capture,
+- feature-stage model comparison,
+- node-only vs node+edge model selection,
+- calibration quality and ranking trade-offs,
+- global feature importance,
+- top-priority evidence frequency,
+- case-level evidence heatmaps,
+- evidence strength across queue rank.
+
+## Reproduce the validated workflow
+
+Install the project:
 
 ```bash
 python -m pip install -e ".[dev]"
+```
+
+For a lightweight repository smoke test:
+
+```bash
 python run_pipeline.py --fixture
 pytest
 ```
 
-## Full Elliptic2 workflow
-
-1. Download Elliptic2 from the official Kaggle dataset page.
-2. Place the five CSV files in `data/raw/elliptic2/`:
-   - `background_edges.csv`
-   - `background_nodes.csv`
-   - `connected_components.csv`
-   - `edges.csv`
-   - `nodes.csv`
-3. Run:
+For the full Elliptic2 analysis, use the staged scripts rather than a single full-raw-data command so the very large CSVs are scanned only when necessary. The main stages are:
 
 ```bash
-python run_pipeline.py --raw-dir data/raw/elliptic2
+python src/build_feature_store.py --raw-dir data/raw/elliptic2
+python src/enrich_node_features.py --raw-dir data/raw/elliptic2
+python src/train_baselines.py --input data/derived/component_features_node_enriched.parquet --results-dir results/node_enriched
+python src/validate_node_enriched_models.py
+python src/enrich_edge_features.py --raw-dir data/raw/elliptic2
+python src/validate_rf_calibration.py
+python src/build_investigator_queue.py --scores results/node_enriched/model_scored_cases.csv --output results/node_enriched/investigator_queue.csv
+python src/build_investigator_evidence.py
+python src/generate_model_selection_figures.py
+python src/generate_calibration_figures.py
+python src/generate_explainability_figures.py
 ```
-
-The ingestion layer is intentionally DuckDB/Parquet-oriented so the full graph does not need to be loaded into pandas at once.
 
 ## Evaluation philosophy
 
-Because AML is highly imbalanced and investigation capacity is constrained, **PR-AUC is the primary global metric**. The more important operational metrics are:
+Because the labeled dataset is severely imbalanced and investigation capacity is constrained, **PR-AUC is the primary global metric**. ROC-AUC is reported as a secondary diagnostic. Operational evaluation emphasizes:
 
-- precision at top *K* investigations,
-- recall at top *K*,
+- precision at constrained review budgets,
+- recall at constrained review budgets,
 - lift versus random review,
-- suspicious cases captured per 100 reviews,
+- suspicious components captured,
 - false-positive workload,
-- stability across time-aware and repeated holdout splits once the full dataset is connected.
+- repeated-split stability,
+- permutation sanity,
+- calibration quality,
+- evidence transparency.
 
-ROC-AUC is reported only as a secondary diagnostic.
+## External research benchmark
 
-## Compliance framing
+The Elliptic2 paper reports graph-native results such as GLASS under its published evaluation setup. Those literature results are kept separate from this project's measured results because the split design and model family differ. A graph-native benchmark remains a future extension rather than a claimed project result.
 
-This is a research and portfolio decision-support system. It does not make legal determinations, file SARs, identify real people, or claim that model scores constitute proof of criminal activity. Current U.S. AML guidance emphasizes risk-based monitoring and useful prioritization rather than generating low-value noise.
+## Compliance and governance framing
+
+This is a public research and portfolio project. It does not identify real people, make accusations, file SARs, make legal determinations, or claim that a model score proves criminal behavior. The preferred output is an **auditable human-review priority queue** with explicit workload trade-offs and statistical evidence cues.
 
 ## Data and research sources
 
-See `sources/SOURCE_REGISTER.md` for the dataset, official implementation guide, research paper, and regulatory references.
+See `sources/SOURCE_REGISTER.md` for the dataset, implementation references, research paper, and regulatory sources.
