@@ -1,7 +1,7 @@
 # Project Status
 
 ## Current phase
-**Phase 4 — edge-enriched benchmark validation**
+**Phase 5 — validated model selection and decision-support hardening**
 
 ### Complete
 - Dataset selection: Elliptic2.
@@ -32,34 +32,51 @@
 - Five-seed node-only validation completed:
   - random forest PR-AUC mean 0.527917, SD 0.008117, range 0.519036–0.539170;
   - random forest ROC-AUC mean 0.927790, SD 0.004619;
+  - random forest Brier score mean 0.015044;
   - top-0.5% precision mean 94.26%, lift mean 41.53x, suspicious captured mean 115.0;
+  - top-1% suspicious captured mean 188.8;
+  - top-2% suspicious captured mean 261.8;
   - shuffled-label PR-AUC 0.020978 / ROC-AUC 0.486122 against 0.022699 prevalence;
   - final stability, permutation, schema-leakage, and feature-dominance gates passed.
-- Validated node-enriched random forest is the primary benchmark.
 - Background-edge enrichment completed successfully on the 196.2M-row table:
-  - 367,137 labeled edge rows and 367,137 distinct labeled edge keys;
+  - exact one-to-one match for all 367,137 labeled edges;
   - zero duplicate labeled keys, missing component IDs, missing labeled edges, or duplicate background matches;
   - all 95 edge features aggregated into 380 component-level edge-derived features;
   - all 121,810 components retained, including all 2,763 suspicious components;
   - zero components without edge coverage and zero null edge aggregates.
-- Initial node+edge benchmark completed on the same seed-42 split:
+- Initial node+edge seed-42 benchmark showed no random-forest improvement:
   - logistic regression PR-AUC 0.151296 / ROC-AUC 0.873186;
-  - random forest PR-AUC 0.487667 / ROC-AUC 0.925434.
-- Edge features do **not** improve the winning random forest on the matched split:
-  - RF PR-AUC falls from 0.530556 node-only to 0.487667 node+edge;
-  - top-0.5% suspicious captured falls from 117 to 114;
-  - top-1% suspicious captured falls from 190 to 176;
-  - top-2% suspicious captured falls from 262 to 242;
-  - ROC-AUC remains essentially flat.
-- Initial conclusion: the 95-edge-feature experiment is technically successful but adds complexity without improving the primary operational model.
+  - random forest PR-AUC 0.487667 / ROC-AUC 0.925434;
+  - RF top-0.5% suspicious captured 114 vs 117 for node-only;
+  - RF top-1% suspicious captured 176 vs 190 for node-only.
+- Five-seed node+edge validation completed:
+  - logistic regression PR-AUC mean 0.153114, SD 0.004512, range 0.147136–0.159009;
+  - logistic regression ROC-AUC mean 0.877282;
+  - random forest PR-AUC mean 0.502180, SD 0.017084, range 0.487667–0.528610;
+  - random forest ROC-AUC mean 0.924748, SD 0.002657;
+  - random forest Brier score mean 0.015671.
+- Repeated node+edge investigator-budget results for random forest:
+  - top 0.5% precision mean 94.10%, lift mean 41.45x, suspicious captured mean 114.8;
+  - top 1% precision mean 73.44%, lift mean 32.35x, suspicious captured mean 179.2;
+  - top 2% precision mean 51.76%, lift mean 22.80x, suspicious captured mean 252.6;
+  - top 5% precision mean 28.24%, lift mean 12.44x, suspicious captured mean 344.2;
+  - top 10% precision mean 17.28%, lift mean 7.61x, suspicious captured mean 421.2.
+- Final model-selection decision:
+  - **preferred model: node-enriched random forest**;
+  - node+edge RF mean PR-AUC is 0.025737 lower than node-only (about 4.9% relative degradation);
+  - node+edge ROC-AUC is essentially flat but slightly lower;
+  - node+edge Brier score is slightly worse;
+  - low-budget capture is essentially tied at 0.5% and worse from 1% through 10%;
+  - edge features modestly improve logistic-regression PR-AUC, but logistic regression remains far behind the winning random forest.
+- The edge experiment is retained as a validated negative incremental-value finding: substantially more data engineering and model dimensionality did not improve the strongest operational model.
 - Investigator queue selection defaults to the highest-average-precision model.
 - 3D visualization remains the project standard.
 
 ### Next
-- Run repeated-split / permutation validation on `data/derived/component_features_node_edge_enriched.parquet` using the same five seeds as the validated node benchmark.
-- Write validation outputs to a separate `results/node_edge_enriched_validation/` directory.
-- Compare repeated node+edge PR-AUC, ROC-AUC, Brier score, and review-budget lift against the validated node-only benchmark.
-- If node+edge underperformance persists, formally retain the simpler node-only random forest as the preferred operational model and present the edge stage as a negative incremental-value finding.
-- Review calibration before presenting raw model scores as probabilities.
-- Add graph-native GLASS-style or equivalent benchmark when compute permits.
-- Produce portfolio-ready 3D comparative visuals from the validated model-selection story: structure vs node vs node+edge.
+- Treat `data/derived/component_features_node_enriched.parquet` and its validated random forest as the preferred operational research baseline.
+- Preserve node+edge results as an ablation / incremental-value comparison rather than as the production feature set.
+- Review and, if useful, calibrate the preferred random-forest scores before describing them as probabilities; until then, present them strictly as ranking scores.
+- Create final 3D comparison visuals for structure vs node vs node+edge, including PR-AUC and constrained-review trade-offs.
+- Add a concise model-selection / workload narrative to the README and portfolio case study only from validated results.
+- Add a graph-native GLASS-style or equivalent benchmark when compute permits, clearly separated from the explainable feature-engineered baseline.
+- Keep all AML outputs framed as research decision support: scores prioritize review and do not establish criminal activity, make legal determinations, or automate regulatory reporting.
