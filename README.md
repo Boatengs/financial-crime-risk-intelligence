@@ -1,6 +1,6 @@
 # Financial Crime Risk Intelligence
 
-**Elliptic2 blockchain AML → scalable feature engineering → constrained-review model selection → calibrated decision support → investigator evidence**
+**Elliptic2 blockchain AML → scalable feature engineering → constrained-review model selection → calibrated decision support → investigator evidence → graph-native benchmark**
 
 Financial Crime Risk Intelligence is an investigator-oriented anti-money-laundering analytics project built on the public **Elliptic2** transaction graph. The project asks a practical question:
 
@@ -97,6 +97,27 @@ A strict 60/20/20 train/calibration/test experiment compared raw, sigmoid, and i
 
 Sigmoid calibration preserves the ranking exactly while materially improving ECE and log loss, so it may be used as an **optional research probability estimate**. Isotonic calibration is not selected for operational ranking because it degrades PR-AUC and the smallest-budget capture.
 
+### 6. Graph complexity did not beat the simpler validated model
+
+A directed dual-channel GraphSAGE classifier was trained on the compact labeled-subgraph graph: **444,521 nodes, 367,137 directed edges, 121,810 components, and all 43 node features**. Seed 42 was required to use the exact same held-out component IDs as the existing random-forest benchmark.
+
+| Matched seed-42 model | PR-AUC | ROC-AUC |
+|---|---:|---:|
+| Node-enriched random forest | **0.5306** | **0.9266** |
+| Directed GraphSAGE | 0.2498 | 0.8702 |
+
+GraphSAGE PR-AUC is **52.9% lower** than the random forest on the matched test set. It also captures fewer suspicious components at every tested review budget:
+
+| Review budget | RF captured | GraphSAGE captured |
+|---:|---:|---:|
+| Top 0.5% | **117** | 72 |
+| Top 1% | **190** | 127 |
+| Top 2% | **262** | 168 |
+| Top 5% | **357** | 238 |
+| Top 10% | **421** | 326 |
+
+This is retained as a **negative-complexity benchmark**: explicit graph message passing added modeling complexity but did not create more investigator value in the labeled-subgraph setting. Because the performance gap is large, the GraphSAGE model is not promoted to repeated-seed model selection.
+
 ## Investigator-facing evidence
 
 The queue uses review-capacity tiers instead of arbitrary probability-like cutoffs:
@@ -145,6 +166,11 @@ Elliptic2 raw CSVs
     |
     +--> case-specific statistical evidence
     |
+    +--> compact labeled-subgraph GraphSAGE benchmark
+    |       |
+    |       +--> exact seed-42 RF test-component match
+    |       +--> rejected for model-selection value
+    |
     +--> Seaborn static + Plotly interactive decision views
 ```
 
@@ -153,11 +179,13 @@ Elliptic2 raw CSVs
 - `reports/CURRENT_FINDINGS.md` — verified project findings
 - `reports/MODEL_VALIDATION.md` — model-validation framing
 - `reports/CALIBRATION_DECISION.md` — ranking vs probability decision
+- `reports/GRAPH_NATIVE_BENCHMARK.md` — completed GraphSAGE benchmark and decision
 - `PROJECT_STATUS.md` — current project state
 - `results/node_enriched/` — preferred single-split benchmark outputs
 - `results/node_enriched_validation/` — repeated validation and leakage checks
 - `results/node_calibration/` — calibration comparison outputs
 - `results/node_edge_enriched_validation/` — edge-feature ablation
+- `results/graph_native/` — graph-native benchmark outputs
 - `results/node_enriched/investigator_queue_explained.csv` — investigator-facing queue with case evidence
 - `results/node_enriched/investigator_evidence_long.csv` — structured evidence for analysis and visualization
 
@@ -179,7 +207,8 @@ Current figure generators cover:
 - global feature importance,
 - top-priority evidence frequency,
 - case-level evidence heatmaps,
-- evidence strength across queue rank.
+- evidence strength across queue rank,
+- RF vs GraphSAGE model quality and review-budget capture.
 
 ## Reproduce the validated workflow
 
@@ -212,6 +241,15 @@ python src/generate_calibration_figures.py
 python src/generate_explainability_figures.py
 ```
 
+The optional graph-native benchmark uses the compact labeled-subgraph graph and does not require another scan of the 196.2M background-edge CSV:
+
+```bash
+python -m pip install -e ".[graph]"
+python src/prepare_graph_native_dataset.py --raw-dir data/raw/elliptic2
+python src/train_graph_native_baseline.py --seeds 42 --device cpu
+python src/generate_graph_native_figures.py
+```
+
 ## Evaluation philosophy
 
 Because the labeled dataset is severely imbalanced and investigation capacity is constrained, **PR-AUC is the primary global metric**. ROC-AUC is reported as a secondary diagnostic. Operational evaluation emphasizes:
@@ -224,11 +262,12 @@ Because the labeled dataset is severely imbalanced and investigation capacity is
 - repeated-split stability,
 - permutation sanity,
 - calibration quality,
-- evidence transparency.
+- evidence transparency,
+- incremental decision value relative to model complexity.
 
 ## External research benchmark
 
-The Elliptic2 paper reports graph-native results such as GLASS under its published evaluation setup. Those literature results are kept separate from this project's measured results because the split design and model family differ. A graph-native benchmark remains a future extension rather than a claimed project result.
+The Elliptic2 paper reports graph-native results such as GLASS under its published evaluation setup. Those literature results remain separate from this project's measured GraphSAGE and random-forest results because graph scope, split design, feature usage, and training procedures differ. The internal GraphSAGE benchmark uses only the compact labeled-subgraph universe and must not be described as a GLASS reproduction.
 
 ## Compliance and governance framing
 
