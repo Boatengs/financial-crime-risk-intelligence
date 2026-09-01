@@ -3,20 +3,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.express as px
 import seaborn as sns
 
 
 PLOT_CONFIG = {"responsive": True, "displaylogo": False}
-
-
-def palette(n: int) -> list[str]:
-    return sns.color_palette("deep", n_colors=max(1, n)).as_hex()
-
-
-def write_plotly(fig: go.Figure, path: Path) -> None:
-    fig.write_html(path, include_plotlyjs="cdn", full_html=True, config=PLOT_CONFIG)
 
 
 def read_model_metric(path: Path, model: str, metric: str) -> float:
@@ -35,9 +28,13 @@ def read_repeated_metric(path: Path, model: str, metric: str) -> float:
     return float(row.iloc[0][metric])
 
 
+def write_plotly(fig, path: Path) -> None:
+    fig.write_html(path, include_plotlyjs="cdn", full_html=True, config=PLOT_CONFIG)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Generate interactive Plotly 3D visuals for final model selection."
+        description="Generate Seaborn and Plotly 2D visuals for final model selection."
     )
     parser.add_argument("--results-dir", default="results")
     parser.add_argument("--figures-dir", default="figures/model_selection")
@@ -46,6 +43,7 @@ def main() -> None:
     results = Path(args.results_dir)
     figures = Path(args.figures_dir)
     figures.mkdir(parents=True, exist_ok=True)
+    sns.set_theme(style="whitegrid", context="talk")
 
     structural_metrics = results / "model_metrics.csv"
     node_metrics = results / "node_enriched" / "model_metrics.csv"
@@ -58,45 +56,55 @@ def main() -> None:
     stages = ["Structure", "Structure + node", "Structure + node + edge"]
     models = ["logistic_regression", "random_forest"]
     stage_files = [structural_metrics, node_metrics, edge_metrics]
-    colors = palette(len(models))
 
-    fig = go.Figure()
-    for model_index, (model, color) in enumerate(zip(models, colors)):
-        pr_auc = [read_model_metric(path, model, "average_precision") for path in stage_files]
-        roc_auc = [read_model_metric(path, model, "roc_auc") for path in stage_files]
-        fig.add_trace(
-            go.Scatter3d(
-                x=list(range(len(stages))),
-                y=[float(model_index)] * len(stages),
-                z=pr_auc,
-                mode="lines+markers",
-                name=model.replace("_", " ").title(),
-                line={"color": color, "width": 8},
-                marker={"color": color, "size": 7},
-                text=[
-                    f"Stage: {stage}<br>Model: {model.replace('_', ' ')}<br>PR-AUC: {ap:.4f}<br>ROC-AUC: {roc:.4f}"
-                    for stage, ap, roc in zip(stages, pr_auc, roc_auc)
-                ],
-                hovertemplate="%{text}<extra></extra>",
+    rows: list[dict[str, float | str]] = []
+    for stage, path in zip(stages, stage_files):
+        for model in models:
+            rows.append(
+                {
+                    "feature_stage": stage,
+                    "model": model.replace("_", " ").title(),
+                    "pr_auc": read_model_metric(path, model, "average_precision"),
+                    "roc_auc": read_model_metric(path, model, "roc_auc"),
+                }
             )
-        )
-    fig.update_layout(
-        title="Feature-stage model comparison — matched seed-42 split",
-        scene={
-            "xaxis": {"title": "Feature stage", "tickmode": "array", "tickvals": [0, 1, 2], "ticktext": stages},
-            "yaxis": {
-                "title": "Model",
-                "tickmode": "array",
-                "tickvals": [0, 1],
-                "ticktext": ["Logistic regression", "Random forest"],
-            },
-            "zaxis_title": "PR-AUC / average precision",
-            "camera": {"eye": {"x": 1.5, "y": -1.6, "z": 1.15}},
-        },
-        margin={"l": 0, "r": 0, "b": 0, "t": 55},
-        legend={"orientation": "h"},
+    stage_df = pd.DataFrame(rows)
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+    sns.lineplot(
+        data=stage_df,
+        x="feature_stage",
+        y="pr_auc",
+        hue="model",
+        marker="o",
+        linewidth=2.5,
+        ax=ax,
     )
-    write_plotly(fig, figures / "feature_stage_pr_auc_3d.html")
+    ax.set_title("Feature-stage model comparison — matched seed-42 split")
+    ax.set_xlabel("Feature stage")
+    ax.set_ylabel("PR-AUC / average precision")
+    ax.tick_params(axis="x", rotation=12)
+    ax.legend(title="Model")
+    fig.savefig(figures / "feature_stage_pr_auc.png", dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+    pfig = px.line(
+        stage_df,
+        x="feature_stage",
+        y="pr_auc",
+        color="model",
+        markers=True,
+        hover_data={"roc_auc": ":.4f", "pr_auc": ":.4f"},
+        labels={
+            "feature_stage": "Feature stage",
+            "pr_auc": "PR-AUC / average precision",
+            "model": "Model",
+            "roc_auc": "ROC-AUC",
+        },
+        title="Feature-stage model comparison — matched seed-42 split",
+    )
+    pfig.update_layout(template="plotly_white")
+    write_plotly(pfig, figures / "feature_stage_pr_auc.html")
 
     node_summary_path = results / "node_enriched_validation" / "repeated_split_summary.csv"
     edge_summary_path = results / "node_edge_enriched_validation" / "repeated_split_summary.csv"
@@ -107,94 +115,107 @@ def main() -> None:
     if missing_validation:
         raise SystemExit(f"Missing validation files: {missing_validation}")
 
-    validation_stages = ["Node only", "Node + edge"]
-    ap_means = [
-        read_repeated_metric(node_summary_path, "random_forest", "average_precision_mean"),
-        read_repeated_metric(edge_summary_path, "random_forest", "average_precision_mean"),
-    ]
-    ap_stds = [
-        read_repeated_metric(node_summary_path, "random_forest", "average_precision_std"),
-        read_repeated_metric(edge_summary_path, "random_forest", "average_precision_std"),
-    ]
-    roc_means = [
-        read_repeated_metric(node_summary_path, "random_forest", "roc_auc_mean"),
-        read_repeated_metric(edge_summary_path, "random_forest", "roc_auc_mean"),
-    ]
+    validation_df = pd.DataFrame(
+        {
+            "feature_set": ["Node only", "Node + edge"],
+            "pr_auc_mean": [
+                read_repeated_metric(node_summary_path, "random_forest", "average_precision_mean"),
+                read_repeated_metric(edge_summary_path, "random_forest", "average_precision_mean"),
+            ],
+            "pr_auc_std": [
+                read_repeated_metric(node_summary_path, "random_forest", "average_precision_std"),
+                read_repeated_metric(edge_summary_path, "random_forest", "average_precision_std"),
+            ],
+            "roc_auc_mean": [
+                read_repeated_metric(node_summary_path, "random_forest", "roc_auc_mean"),
+                read_repeated_metric(edge_summary_path, "random_forest", "roc_auc_mean"),
+            ],
+        }
+    )
 
-    fig = go.Figure(
-        data=[
-            go.Scatter3d(
-                x=[0, 1],
-                y=ap_stds,
-                z=ap_means,
-                mode="lines+markers+text",
-                text=validation_stages,
-                textposition="top center",
-                marker={"size": 9, "color": palette(2)},
-                line={"width": 6},
-                customdata=roc_means,
-                hovertemplate=(
-                    "Feature set: %{text}<br>Mean PR-AUC: %{z:.4f}"
-                    "<br>PR-AUC SD: %{y:.4f}<br>Mean ROC-AUC: %{customdata:.4f}<extra></extra>"
-                ),
-            )
-        ]
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.barplot(data=validation_df, x="feature_set", y="pr_auc_mean", ax=ax)
+    ax.errorbar(
+        x=range(len(validation_df)),
+        y=validation_df["pr_auc_mean"],
+        yerr=validation_df["pr_auc_std"],
+        fmt="none",
+        capsize=6,
+        linewidth=1.5,
     )
-    fig.update_layout(
-        title="Validated random-forest model selection",
-        scene={
-            "xaxis": {"title": "Feature set", "tickmode": "array", "tickvals": [0, 1], "ticktext": validation_stages},
-            "yaxis_title": "PR-AUC standard deviation",
-            "zaxis_title": "Mean PR-AUC",
-            "camera": {"eye": {"x": 1.45, "y": -1.45, "z": 1.2}},
+    ax.set_title("Validated random-forest model selection")
+    ax.set_xlabel("Feature set")
+    ax.set_ylabel("Mean PR-AUC")
+    fig.savefig(figures / "validated_rf_pr_auc.png", dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+    pfig = px.bar(
+        validation_df,
+        x="feature_set",
+        y="pr_auc_mean",
+        error_y="pr_auc_std",
+        hover_data={"roc_auc_mean": ":.4f", "pr_auc_mean": ":.4f", "pr_auc_std": ":.4f"},
+        labels={
+            "feature_set": "Feature set",
+            "pr_auc_mean": "Mean PR-AUC",
+            "roc_auc_mean": "Mean ROC-AUC",
+            "pr_auc_std": "PR-AUC SD",
         },
-        margin={"l": 0, "r": 0, "b": 0, "t": 55},
-        showlegend=False,
+        title="Validated random-forest model selection",
     )
-    write_plotly(fig, figures / "validated_rf_pr_auc_3d.html")
+    pfig.update_layout(template="plotly_white")
+    write_plotly(pfig, figures / "validated_rf_pr_auc.html")
 
     node_budget = pd.read_csv(node_budget_path)
     edge_budget = pd.read_csv(edge_budget_path)
-    node_rf = node_budget.loc[node_budget["model"] == "random_forest"].sort_values("review_fraction")
-    edge_rf = edge_budget.loc[edge_budget["model"] == "random_forest"].sort_values("review_fraction")
+    node_rf = node_budget.loc[node_budget["model"] == "random_forest"].copy()
+    node_rf["feature_set"] = "Node only"
+    edge_rf = edge_budget.loc[edge_budget["model"] == "random_forest"].copy()
+    edge_rf["feature_set"] = "Node + edge"
+    budget_df = pd.concat([node_rf, edge_rf], ignore_index=True)
+    budget_df["review_budget_pct"] = budget_df["review_fraction"] * 100
 
-    fig = go.Figure()
-    for stage_index, (label, frame, color) in enumerate(
-        zip(["Node only", "Node + edge"], [node_rf, edge_rf], palette(2))
-    ):
-        review_pct = frame["review_fraction"].to_numpy(dtype=float) * 100
-        lift = frame["lift_at_budget_mean"].to_numpy(dtype=float)
-        captured = frame["suspicious_captured_mean"].to_numpy(dtype=float)
-        fig.add_trace(
-            go.Scatter3d(
-                x=review_pct,
-                y=[float(stage_index)] * len(frame),
-                z=lift,
-                mode="lines+markers",
-                name=label,
-                line={"color": color, "width": 8},
-                marker={"color": color, "size": 7},
-                customdata=captured,
-                hovertemplate=(
-                    f"Feature set: {label}<br>Review budget: %{{x:.1f}}%"
-                    "<br>Mean lift: %{z:.2f}x<br>Mean suspicious captured: %{customdata:.1f}<extra></extra>"
-                ),
-            )
-        )
-    fig.update_layout(
-        title="Validated investigator lift — node-only vs node+edge",
-        scene={
-            "xaxis_title": "Review budget (% of held-out cases)",
-            "yaxis": {"title": "Feature set", "tickmode": "array", "tickvals": [0, 1], "ticktext": ["Node only", "Node + edge"]},
-            "zaxis_title": "Mean lift vs random review",
-            "camera": {"eye": {"x": 1.55, "y": -1.55, "z": 1.15}},
-        },
-        margin={"l": 0, "r": 0, "b": 0, "t": 55},
-        legend={"orientation": "h"},
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.lineplot(
+        data=budget_df,
+        x="review_budget_pct",
+        y="lift_at_budget_mean",
+        hue="feature_set",
+        marker="o",
+        linewidth=2.5,
+        ax=ax,
     )
-    write_plotly(fig, figures / "validated_review_lift_comparison_3d.html")
+    ax.set_title("Validated investigator lift — node-only vs node+edge")
+    ax.set_xlabel("Review budget (% of held-out cases)")
+    ax.set_ylabel("Mean lift vs random review")
+    ax.legend(title="Feature set")
+    fig.savefig(figures / "validated_review_lift_comparison.png", dpi=180, bbox_inches="tight")
+    plt.close(fig)
 
-    print(f"Wrote interactive Plotly 3D model-selection figures to {figures}")
+    pfig = px.line(
+        budget_df,
+        x="review_budget_pct",
+        y="lift_at_budget_mean",
+        color="feature_set",
+        markers=True,
+        hover_data={
+            "suspicious_captured_mean": ":.1f",
+            "precision_at_budget_mean": ":.3f",
+            "recall_at_budget_mean": ":.3f",
+            "lift_at_budget_mean": ":.2f",
+        },
+        labels={
+            "review_budget_pct": "Review budget (%)",
+            "lift_at_budget_mean": "Mean lift vs random review",
+            "feature_set": "Feature set",
+            "suspicious_captured_mean": "Mean suspicious captured",
+        },
+        title="Validated investigator lift — node-only vs node+edge",
+    )
+    pfig.update_layout(template="plotly_white")
+    write_plotly(pfig, figures / "validated_review_lift_comparison.html")
+
+    print(f"Wrote Seaborn PNG and Plotly HTML model-selection figures to {figures}")
 
 
 if __name__ == "__main__":
