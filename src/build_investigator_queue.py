@@ -6,13 +6,18 @@ from pathlib import Path
 import pandas as pd
 
 
-def band(score: float) -> str:
-    if score >= 0.90:
-        return "critical"
-    if score >= 0.75:
-        return "high"
-    if score >= 0.50:
-        return "elevated"
+def priority_band(rank: int, total: int) -> str:
+    fraction = rank / total
+    if fraction <= 0.005:
+        return "tier_1_top_0_5pct"
+    if fraction <= 0.01:
+        return "tier_2_top_1pct"
+    if fraction <= 0.02:
+        return "tier_3_top_2pct"
+    if fraction <= 0.05:
+        return "tier_4_top_5pct"
+    if fraction <= 0.10:
+        return "tier_5_top_10pct"
     return "standard"
 
 
@@ -63,15 +68,22 @@ def main():
         frame[frame["model"].astype(str) == selected_model]
         .copy()
         .sort_values("risk_score", ascending=False)
+        .reset_index(drop=True)
     )
-    frame.insert(0, "rank", range(1, len(frame) + 1))
-    frame["risk_band"] = frame["risk_score"].map(band)
-    frame["reason_1"] = "model-prioritized transaction subgraph"
-    frame["reason_2"] = "review structural and feature evidence before escalation"
+    total = len(frame)
+    frame.insert(0, "rank", range(1, total + 1))
+    frame["review_fraction_rank"] = frame["rank"] / total
+    frame["priority_band"] = [priority_band(int(rank), total) for rank in frame["rank"]]
+    frame["score_type"] = "ranking_score_not_probability"
+    frame["reason_1"] = frame["priority_band"].map(
+        lambda value: f"model-ranked component in {value.replace('_', ' ')}"
+    )
+    frame["reason_2"] = "review component evidence before escalation; model score is not proof of criminal activity"
+
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(out, index=False)
-    print(f"Wrote {out} using {selected_model}")
+    print(f"Wrote {out} using {selected_model} with capacity-based priority bands")
 
 
 if __name__ == "__main__":
