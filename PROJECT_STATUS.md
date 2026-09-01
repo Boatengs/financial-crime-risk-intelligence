@@ -1,7 +1,7 @@
 # Project Status
 
 ## Current phase
-**Phase 5 — validated model selection and decision-support hardening**
+**Phase 5 — validated model selection and calibration hardening**
 
 ### Complete
 - Dataset selection: Elliptic2.
@@ -69,14 +69,24 @@
   - low-budget capture is essentially tied at 0.5% and worse from 1% through 10%;
   - edge features modestly improve logistic-regression PR-AUC, but logistic regression remains far behind the winning random forest.
 - The edge experiment is retained as a validated negative incremental-value finding: substantially more data engineering and model dimensionality did not improve the strongest operational model.
+- Raw node-only random-forest reliability diagnostic reviewed:
+  - 10-bin weighted ECE is about 0.009 on the seed-42 held-out split;
+  - lowest score band is mildly over-confident (mean score ~1.42%, observed rate ~0.78%);
+  - mid/high score bands are generally under-confident, including ~54.2% mean score vs 77.8% observed in the 0.5–0.6 band and ~64.4% vs 90.9% in the 0.6–0.7 band;
+  - 0.8+ bands are 100% suspicious in this split but contain only 31 and 37 cases, so probability claims remain too strong.
+- Held-out calibration validator added at `src/validate_rf_calibration.py`:
+  - 60/20/20 train/calibration/test design;
+  - compares raw RF, sigmoid calibration, and isotonic calibration;
+  - reports PR-AUC, ROC-AUC, Brier score, log loss, ECE, calibration bins, and constrained-review metrics.
 - Investigator queue selection defaults to the highest-average-precision model.
 - 3D visualization remains the project standard.
 
 ### Next
-- Treat `data/derived/component_features_node_enriched.parquet` and its validated random forest as the preferred operational research baseline.
-- Preserve node+edge results as an ablation / incremental-value comparison rather than as the production feature set.
-- Review and, if useful, calibrate the preferred random-forest scores before describing them as probabilities; until then, present them strictly as ranking scores.
-- Create final 3D comparison visuals for structure vs node vs node+edge, including PR-AUC and constrained-review trade-offs.
+- Run `src/validate_rf_calibration.py` on `data/derived/component_features_node_enriched.parquet`.
+- Compare raw, sigmoid, and isotonic Brier score / ECE while verifying that PR-AUC and constrained-review ranking are not materially degraded.
+- Keep the raw random-forest score as the investigator ranking signal unless a calibrated probability layer clearly improves probability quality without harming operational performance.
+- Generate final 3D model-selection and calibration visuals after the calibration method is selected.
 - Add a concise model-selection / workload narrative to the README and portfolio case study only from validated results.
+- Harden investigator-facing reason-code / explanation outputs for the preferred node-only model.
 - Add a graph-native GLASS-style or equivalent benchmark when compute permits, clearly separated from the explainable feature-engineered baseline.
 - Keep all AML outputs framed as research decision support: scores prioritize review and do not establish criminal activity, make legal determinations, or automate regulatory reporting.
