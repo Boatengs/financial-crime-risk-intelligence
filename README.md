@@ -118,6 +118,26 @@ GraphSAGE PR-AUC is **52.9% lower** than the random forest on the matched test s
 
 This is retained as a **negative-complexity benchmark**: explicit graph message passing added modeling complexity but did not create more investigator value in the labeled-subgraph setting. Because the performance gap is large, the GraphSAGE model is not promoted to repeated-seed model selection.
 
+## Visual proof of validated results
+
+The charts below are committed README assets built only from verified project outputs. Repeated-validation and matched seed-42 results are labeled separately to avoid implying they come from the same experiment.
+
+### Investigator capture under constrained review capacity
+
+![Five-seed mean suspicious components captured by review budget](docs/readme/review_budget_capture.svg)
+
+### Calibration quality
+
+![Expected calibration error for raw random forest, sigmoid, and isotonic calibration](docs/readme/calibration_ece.svg)
+
+### Matched seed-42 RF vs GraphSAGE PR-AUC
+
+![Matched seed-42 PR-AUC comparison between node-enriched random forest and directed GraphSAGE](docs/readme/graph_native_pr_auc.svg)
+
+### Matched seed-42 review-budget capture
+
+![Matched seed-42 suspicious component capture by review budget for random forest and GraphSAGE](docs/readme/graph_native_budget_capture.svg)
+
 ## Investigator-facing evidence
 
 The queue uses review-capacity tiers instead of arbitrary probability-like cutoffs:
@@ -189,7 +209,7 @@ Elliptic2 raw CSVs
 - `results/node_enriched/investigator_queue_explained.csv` — investigator-facing queue with case evidence
 - `results/node_enriched/investigator_evidence_long.csv` — structured evidence for analysis and visualization
 
-Generated result files and figures are intentionally ignored by Git; the code needed to reproduce them is versioned.
+Generated result files and figures are intentionally ignored by Git; the code needed to reproduce them is versioned. The small SVG files under `docs/readme/` are committed intentionally so GitHub can render proof-of-results charts directly in this README.
 
 ## Visualization standard
 
