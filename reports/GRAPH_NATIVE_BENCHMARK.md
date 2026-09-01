@@ -2,79 +2,84 @@
 
 ## Purpose
 
-The validated node-enriched random forest remains the current operational benchmark. This stage asks a separate question:
+This benchmark tests whether explicit graph message passing adds decision value beyond the validated node-enriched random forest used for investigator prioritization.
 
-> Does explicit message passing over the labeled transaction subgraphs add decision value beyond component-level feature aggregation when both methods are evaluated on the same held-out components?
+The comparison is intentionally internal and fair: seed 42 uses the same 80/20 component split as the existing node-enriched random forest. The graph benchmark uses only the labeled Elliptic2 subgraph universe—444,521 labeled nodes, 367,137 labeled edges, 121,810 labeled components, and the 43 node features. It does **not** use the 196.2M-row background edge graph and is **not** a reproduction of GLASS.
 
-The first project graph baseline is intentionally smaller than a full GLASS reproduction so it can be run on the labeled subgraph universe without loading the entire 196.2M-edge background graph into a graph-learning framework.
+## Data integrity
 
-## Internal project benchmark
+The graph-native dataset preparation passed all integrity checks:
 
-`src/prepare_graph_native_dataset.py` prepares:
+- 444,521 labeled node rows and 444,521 distinct labeled nodes.
+- 444,521 matched node rows; zero missing labeled nodes.
+- Zero duplicate background-node matches.
+- 43 node features recovered.
+- 367,137 labeled edges retained.
+- Zero missing source or target nodes.
+- Zero cross-component edges.
+- 121,810 components retained, including 2,763 suspicious components.
+- Zero null component labels.
 
-- 444,521 labeled nodes;
-- 367,137 labeled directed edges;
-- 121,810 labeled connected components;
-- 43 node features recovered from `background_nodes.csv`.
+## Model
 
-It scans `background_nodes.csv` once to recover labeled-node features. It does **not** scan `background_edges.csv`.
+The project graph baseline is a directed dual-channel GraphSAGE classifier with:
 
-`src/train_graph_native_baseline.py` trains a graph classifier with:
-
-- separate forward and reverse GraphSAGE message-passing channels;
+- separate forward and reverse message-passing channels;
 - 43 standardized node features;
 - two message-passing layers by default;
-- global mean + global max graph pooling;
-- class-weighted binary cross-entropy;
-- an internal validation subset used only to select the training epoch count;
-- retraining on the full 80% training split before final test evaluation.
+- graph-level mean and max pooling;
+- class-weighted binary loss;
+- an internal validation subset used only to select epoch count;
+- retraining on the full 80% training split before one evaluation on the untouched 20% test set.
 
-For seed 42, the script verifies that the 20% test component IDs exactly match the existing node-enriched random-forest test component set. This makes the project comparison directly interpretable at the same review budgets.
+Seed 42 selected epoch 18 with validation PR-AUC **0.244746**.
 
-## Metrics
+## Seed-42 matched-test results
 
-The graph benchmark reports the same decision metrics used elsewhere in the project:
+| Model | PR-AUC | ROC-AUC | Base rate |
+| --- | ---: | ---: | ---: |
+| Node-enriched random forest | 0.530556 | 0.926611 | 0.022699 |
+| Directed GraphSAGE | 0.249817 | 0.870199 | 0.022699 |
 
-- PR-AUC / average precision as the primary global metric;
-- ROC-AUC as a secondary diagnostic;
-- Brier score as a score-quality diagnostic;
-- precision, recall, lift, and suspicious components captured at 0.5%, 1%, 2%, 5%, and 10% review budgets.
+GraphSAGE PR-AUC is **0.280739 lower**, a **52.9% relative reduction** versus the random forest. ROC-AUC is also lower by **0.056412**.
+
+The GraphSAGE Brier score is **0.138866**. This raw graph-model output is not used as a probability estimate; the primary decision criterion remains ranking and constrained-review performance.
+
+## Investigator-budget comparison
+
+| Review budget | RF captured | GraphSAGE captured | RF precision | GraphSAGE precision | RF lift | GraphSAGE lift |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.5% | 117 | 72 | 95.90% | 59.02% | 42.25x | 26.00x |
+| 1% | 190 | 127 | 77.87% | 52.05% | 34.30x | 22.93x |
+| 2% | 262 | 168 | 53.69% | 34.43% | 23.65x | 15.17x |
+| 5% | 357 | 238 | 29.29% | 19.52% | 12.90x | 8.60x |
+| 10% | 421 | 326 | 17.28% | 13.38% | 7.61x | 5.89x |
+
+GraphSAGE captures fewer suspicious components at every review budget. The deficits versus the random forest are:
+
+- top 0.5%: **45 fewer**;
+- top 1%: **63 fewer**;
+- top 2%: **94 fewer**;
+- top 5%: **119 fewer**;
+- top 10%: **95 fewer**.
+
+## Decision
+
+**The node-enriched random forest remains the preferred research and investigator-prioritization model.**
+
+The graph-native baseline is retained as a negative-complexity result: within the labeled-subgraph setting and matched seed-42 test set, directed GraphSAGE adds modeling complexity without improving global ranking quality or investigator-budget capture.
+
+A five-seed GraphSAGE validation is not required for current model selection because the seed-42 gap is large across PR-AUC, ROC-AUC, and every operational review budget. Additional graph experiments are therefore research extensions rather than required validation of the current benchmark choice.
 
 ## External GLASS reference
 
-The Elliptic2 paper reports GLASS test PR-AUC of approximately 0.208 and ROC-AUC of approximately 0.889 under its published experimental setup. The official Elliptic2 preprocessing guide uses the full background graph for GLASS/GNNSeg inputs.
+The Elliptic2 paper reports GLASS test PR-AUC of approximately 0.208 and ROC-AUC of approximately 0.889 under its published experimental setup. The official preprocessing guide uses the full background graph for GLASS/GNNSeg inputs.
 
-Those published values are **external reference benchmarks**, not project results. They should not be directly compared to the project GraphSAGE or random-forest metrics because the graph scope, split procedure, feature usage, and training setup differ.
-
-The paper also reports that node and edge features were not used in its GLASS experiments because the full graph was too large for that feature-rich setup. In contrast, the project GraphSAGE baseline deliberately uses the 43 labeled-node features on the much smaller labeled-subgraph universe.
+Those published values remain **external reference benchmarks**, not project results. They should not be directly compared to the project GraphSAGE or random-forest metrics because graph scope, split procedure, feature usage, and training setup differ.
 
 ## Interpretation rules
 
-- A graph model score is a prioritization signal, not proof of criminal activity.
-- If the graph model underperforms the node-enriched random forest, that is a valid negative result; graph complexity is not automatically decision value.
-- If the graph model improves ranking, repeated-seed validation is required before changing the preferred model.
-- Published GLASS numbers remain in a separate external-reference section until a true full-background-graph reproduction is run.
-
-## Local workflow
-
-```bash
-pip install -e '.[graph]'
-
-python src/prepare_graph_native_dataset.py \
-  --raw-dir data/raw/elliptic2
-
-python src/train_graph_native_baseline.py \
-  --seeds 42 \
-  --device cpu
-```
-
-Inspect:
-
-```bash
-cat results/graph_native/graph_dataset_profile.json
-cat results/graph_native/graph_native_metrics.csv
-cat results/graph_native/seed42_internal_comparison.csv
-cat results/graph_native/seed42_budget_comparison.csv
-```
-
-If seed 42 is competitive, the next validation step is to rerun the graph model across the same five seeds used for the node-enriched random forest.
+- Graph and random-forest scores are prioritization signals, not proof of criminal activity.
+- This benchmark supports model selection under constrained review capacity; it does not make legal or regulatory determinations.
+- The negative GraphSAGE result is valid evidence that additional model complexity did not create more decision value in this internal setup.
+- Published GLASS numbers remain separate until a true full-background-graph reproduction is run.
