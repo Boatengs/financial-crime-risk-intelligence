@@ -58,7 +58,11 @@
   - raw-score thresholds such as `0.90 = critical` removed;
   - queue now uses capacity-based priority tiers: top 0.5%, 1%, 2%, 5%, 10%, then standard;
   - queue explicitly marks the model output as `ranking_score_not_probability`.
-- 3D visualization remains the project standard.
+- Visualization standard corrected and locked:
+  - **interactive Plotly 3D is the default for all 3D project visuals**;
+  - Seaborn supplies statistical styling / palettes where useful;
+  - Matplotlib `mplot3d` is no longer the primary 3D renderer;
+  - generated interactive visuals are written as browser-ready `.html` files.
 
 ### Current operational interpretation
 - Structural features alone carry little useful AML prioritization signal.
@@ -70,7 +74,7 @@
 
 ### Next
 - Regenerate the preferred node-only investigator queue with capacity-based priority tiers.
-- Generate final 3D model-selection and calibration visuals.
+- Generate final interactive Plotly 3D model-selection and calibration visuals.
 - Replace placeholder investigator reason text with evidence-based, case-specific explanation outputs that do not over-interpret anonymized source features.
 - Add a concise validated model-selection / workload narrative to the README and portfolio case study.
 - Add a graph-native GLASS-style or equivalent benchmark when compute permits, clearly separated from the feature-engineered baseline.
