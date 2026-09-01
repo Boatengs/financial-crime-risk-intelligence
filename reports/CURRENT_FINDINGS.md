@@ -126,13 +126,27 @@ This choice is supported by three considerations:
 
 The edge experiment is therefore a validated negative incremental-value result: more data and more features did not automatically create more investigator value. This is an important engineering and model-governance conclusion, not a failed experiment.
 
+## Raw-score calibration diagnostic
+
+The seed-42 node-only random-forest reliability table shows that the raw score is useful for ranking but should not yet be presented as a literal suspicious-activity probability.
+
+The 10 equal-width score bins show:
+- in the lowest `(0.0, 0.1]` band, 22,873 cases have a mean score of about 1.42% and an observed suspicious rate of about 0.78%, so the model is mildly over-confident at the low end;
+- in the `(0.5, 0.6]` band, the mean score is about 54.2% while the observed suspicious rate is 77.8%;
+- in the `(0.6, 0.7]` band, the mean score is about 64.4% while the observed suspicious rate is 90.9%;
+- the `(0.8, 0.9]` and `(0.9, 1.0]` bands are 100% suspicious in this held-out split, but contain only 31 and 37 cases respectively.
+
+The weighted 10-bin expected calibration error from this table is about 0.009, so aggregate calibration is not poor. However, calibration error is uneven across the score range and the high-score bins are small. That makes probability language too strong even though the ranking signal is excellent.
+
+`src/validate_rf_calibration.py` therefore evaluates the preferred node-only random forest on a fully held-out 60/20/20 train/calibration/test design. It compares the raw score with sigmoid (Platt-style) and isotonic calibration and reports Brier score, log loss, ECE, PR-AUC, ROC-AUC, and constrained-review metrics.
+
 ### Current interpretation
 1. Basic connected-component structure contains limited risk signal.
 2. The anonymized node features add substantial, repeatable predictive signal, especially for the nonlinear random forest.
 3. The node-only random forest remains strong across repeated splits and constrained review budgets.
 4. The edge feature pipeline is technically correct but does not improve the preferred random forest and makes it less stable on PR-AUC.
 5. The preferred model should therefore retain structural + node-derived features and exclude the 380 edge aggregates from the operational baseline.
-6. Raw model scores remain ranking signals rather than calibrated probabilities until calibration is explicitly validated.
+6. Raw random-forest outputs should remain ranking scores unless the held-out calibration experiment supports a calibrated probability layer.
 7. Scores do not establish criminal activity, make legal determinations, or automate regulatory reporting.
 
-The next project stage should focus on calibration, final 3D comparative visuals, investigator-facing explanation outputs, and a clearly separated graph-native benchmark rather than adding more tabular features by default.
+The next project stage should evaluate held-out calibration, generate final 3D model-selection and calibration visuals, harden investigator-facing explanation outputs, and keep any graph-native benchmark clearly separated from the validated feature-engineered baseline.
