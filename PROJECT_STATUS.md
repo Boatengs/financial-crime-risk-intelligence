@@ -1,7 +1,7 @@
 # Project Status
 
 ## Current phase
-**Phase 4 — validated node benchmark and background-edge enrichment**
+**Phase 4 — edge-enriched model benchmarking**
 
 ### Complete
 - Dataset selection: Elliptic2.
@@ -38,7 +38,7 @@
   - top 1% precision mean 77.38%, lift mean 34.09x, suspicious captured mean 188.8.
 - Shuffled-label sanity check passed:
   - random forest PR-AUC 0.020978 / ROC-AUC 0.486122 against 0.022699 prevalence.
-- Final validation gate passed:
+- Final node validation gate passed:
   - repeated-split stability pass;
   - permutation sanity pass;
   - schema leakage audit pass;
@@ -46,23 +46,27 @@
   - top-10 cumulative importance 38.46%;
   - feature-dominance manual review not recommended by the gate.
 - Validated node-enriched random forest promoted to the primary benchmark for the edge-feature experiment.
-- Resource-controlled edge-enrichment script added at `src/enrich_edge_features.py`.
-- Edge-enrichment design:
-  - full-key match on `(clId1, clId2, txId)`;
-  - strict audit for duplicate labeled keys, missing component mappings, unmatched labeled edges, and duplicate background matches;
+- Background-edge enrichment completed successfully on the 196.2M-row table:
+  - 367,137 labeled edge rows and 367,137 distinct labeled edge keys;
+  - zero duplicate labeled edge keys;
+  - zero missing component mappings;
+  - 367,137 background matches and 367,137 distinct matched edge keys;
+  - zero missing labeled edges and zero duplicate background matches;
   - all 95 edge features aggregated by mean, population standard deviation, minimum, and maximum;
-  - 380 component-level edge-derived features;
-  - explicit zero coverage handling for components without matched edges.
+  - 380 component-level edge-derived features created;
+  - all 121,810 components retained, including all 2,763 suspicious components;
+  - zero components without edge-feature coverage;
+  - zero rows with null edge aggregates.
+- Edge-enriched feature store written to `data/derived/component_features_node_edge_enriched.parquet`.
 - Investigator queue selection defaults to the highest-average-precision model.
 - 3D visualization remains the project standard.
 
 ### Next
-- Pull the latest repository changes.
-- Run `src/enrich_edge_features.py --raw-dir data/raw/elliptic2` locally. This is the heaviest CSV scan so far because it must process the 196.2M-row background-edge table with 95 feature columns.
-- Inspect `results/edge_feature_enrichment_profile.json` before model fitting.
-- Require exact one-to-one labeled-edge coverage or stop and diagnose the match audit.
-- If the edge audit passes, train logistic regression and random forest on `data/derived/component_features_node_edge_enriched.parquet` into a separate results directory.
-- Compare edge-enriched PR-AUC, ROC-AUC, calibration, and review-budget lift against the validated node benchmark (RF PR-AUC mean ~0.528; top-0.5% lift mean ~41.5x).
-- Run repeated-split / permutation validation on the winning edge-enriched model before making portfolio claims.
+- Train logistic regression and random forest on `data/derived/component_features_node_edge_enriched.parquet` into a separate `results/node_edge_enriched/` directory.
+- Build a separate edge-enriched investigator queue and 3D figures.
+- Compare edge-enriched PR-AUC, ROC-AUC, and review-budget lift against the validated node benchmark (RF PR-AUC mean ~0.528; top-0.5% lift mean ~41.5x).
+- If edge features materially improve the initial benchmark, run repeated-split / permutation validation using `src/validate_node_enriched_models.py --input data/derived/component_features_node_edge_enriched.parquet --results-dir results/node_edge_enriched_validation`.
+- If edge features do not materially improve results, retain the simpler validated node model as the preferred operational baseline and document the negative incremental-value finding.
+- Review calibration before presenting raw model scores as probabilities.
 - Add graph-native GLASS-style or equivalent benchmark when compute permits.
 - Produce portfolio-ready findings and 3D comparative visuals only from verified, validated real-data outputs.
