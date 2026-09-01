@@ -1,7 +1,7 @@
 # Project Status
 
 ## Current phase
-**Phase 5 — validated model selection and investigator-product hardening**
+**Phase 6 — graph-native benchmark**
 
 ### Complete
 - Dataset: Elliptic2.
@@ -41,7 +41,7 @@
   - ROC-AUC mean 0.924748;
   - Brier mean 0.015671;
   - edge enrichment does not improve the winning random forest.
-- Final model selection:
+- Final feature-engineered model selection:
   - **preferred model: node-enriched random forest**;
   - node+edge mean PR-AUC is ~4.9% lower and less stable;
   - node-only matches the edge model at the 0.5% review budget and performs better from 1% through 10%;
@@ -71,25 +71,39 @@
   - case-level evidence z-score heatmap for the highest-ranked components;
   - evidence strength across investigator queue rank;
   - every view is emitted as both Seaborn `.png` and Plotly `.html`.
-- Visualization standard corrected and locked:
+- Visualization standard:
   - **standard 2D Seaborn and Plotly charts are the project visualization standard**;
   - Seaborn generates presentation-ready static `.png` figures;
   - Plotly generates interactive `.html` counterparts with hover and zoom;
   - no 3D rendering is required or implied.
+- Portfolio packaging:
+  - README rewritten around verified results and decision value;
+  - Financial Crime Risk Intelligence added as Project 13 in the portfolio work index;
+  - portfolio GitHub Pages deployment passed.
+- Graph-native benchmark scaffold added:
+  - `src/prepare_graph_native_dataset.py` prepares a compact labeled-subgraph graph dataset from 444,521 labeled nodes, 367,137 labeled edges, 121,810 components, and 43 node features;
+  - preparation scans `background_nodes.csv` once and does not scan `background_edges.csv`;
+  - `src/train_graph_native_baseline.py` implements a directed dual-channel GraphSAGE graph classifier with global mean + max pooling;
+  - seed 42 must exactly match the existing node-enriched RF test component set before evaluation;
+  - the internal validation subset selects the training epoch count, after which the graph model is retrained on the full 80% training split;
+  - graph results use the same PR-AUC and constrained-review metrics as the feature-engineered benchmark;
+  - `reports/GRAPH_NATIVE_BENCHMARK.md` documents scope, controls, and the separation from published GLASS results.
 
 ### Current operational interpretation
 - Structural features alone carry little useful AML prioritization signal.
-- Node-derived features provide the dominant validated signal.
-- Edge-derived aggregates add major engineering cost without improving the strongest model.
+- Node-derived features provide the dominant validated signal in the feature-engineered models.
+- Edge-derived component aggregates add major engineering cost without improving the strongest model.
 - Ranking quality matters more than probability calibration for the primary investigator-queue use case.
 - Raw scores must not be described as literal suspicious-activity probabilities.
 - Case-level evidence should describe statistical feature extremeness and global model importance, not invent meanings for anonymized features.
 - Global feature importance and case-specific evidence are distinct concepts and should not be presented as causal explanations.
 - Scores and evidence prioritize human review only; they do not establish criminal activity, make legal determinations, or automate regulatory reporting.
+- The new GraphSAGE experiment is an internal labeled-subgraph benchmark, not a full-background-graph GLASS reproduction.
+- Published GLASS metrics remain external reference numbers because graph scope, split procedure, and feature usage differ.
 
 ### Next
-- Pull the latest repository changes and run `src/generate_explainability_figures.py` against the verified structured evidence table.
-- Inspect the Seaborn and Plotly explainability outputs for readability and correct priority-tier behavior.
-- Add a concise validated model-selection / workload / explainability narrative to the README and portfolio case study.
-- Build the final investigator-facing example queue/table for the portfolio case study using only validated and carefully qualified outputs.
-- Add a graph-native GLASS-style or equivalent benchmark when compute permits, clearly separated from the feature-engineered baseline.
+- Install the optional graph dependencies with `pip install -e '.[graph]'`.
+- Run `src/prepare_graph_native_dataset.py --raw-dir data/raw/elliptic2` and verify perfect graph-dataset integrity.
+- Run the seed-42 GraphSAGE benchmark and compare PR-AUC plus investigator-budget capture against the exact same RF test components.
+- If seed 42 is competitive, repeat the graph benchmark on seeds 11, 23, 42, 71, and 101 before reconsidering the preferred model.
+- Keep a true full-background-graph GLASS reproduction as a separate future benchmark because it requires the 49.3M-node / 196.2M-edge graph context.
