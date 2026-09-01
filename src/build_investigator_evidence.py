@@ -9,11 +9,13 @@ import pandas as pd
 
 def evidence_text(feature: str, value: float, percentile: float, zscore: float, importance: float) -> str:
     direction = "above" if zscore >= 0 else "below"
-    tail = "upper" if percentile >= 0.5 else "lower"
-    tail_pct = percentile * 100 if percentile >= 0.5 else (1.0 - percentile) * 100
+    if percentile >= 0.5:
+        tail_text = f"top {(1.0 - percentile) * 100:.1f}%"
+    else:
+        tail_text = f"bottom {percentile * 100:.1f}%"
     return (
         f"{feature}: value={value:.4g}; {percentile * 100:.1f}th percentile "
-        f"({tail_pct:.1f}% {tail} tail); {abs(zscore):.2f} SD {direction} overall mean; "
+        f"({tail_text}); {abs(zscore):.2f} SD {direction} overall mean; "
         f"global RF importance={importance:.2%}"
     )
 
@@ -43,6 +45,11 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default="results/node_enriched/investigator_queue_explained.csv",
+    )
+    parser.add_argument(
+        "--long-output",
+        default="results/node_enriched/investigator_evidence_long.csv",
+        help="Structured long-form evidence table for analysis and visualization.",
     )
     parser.add_argument("--global-top-n", type=int, default=15)
     parser.add_argument("--evidence-count", type=int, default=3)
@@ -109,22 +116,47 @@ def main() -> None:
 
     evidence_columns = [f"evidence_{i}" for i in range(1, args.evidence_count + 1)]
     evidence_rows: list[list[str]] = []
+    long_rows: list[dict] = []
+
+    queue_metadata = [
+        column
+        for column in ("rank", "component_id", "priority_band", "risk_score", "model", "score_type")
+        if column in merged.columns
+    ]
 
     for _, row in merged.iterrows():
-        candidates: list[tuple[float, str]] = []
+        candidates: list[tuple[float, str, str, float, float, float, float]] = []
         for feature in candidate_features:
             value = float(row[f"__value__{feature}"])
             pct = float(row[f"__pct__{feature}"])
             z = float(row[f"__z__{feature}"])
             imp = float(imp_map[feature])
-            unusualness = abs(z)
-            score = imp * unusualness
+            evidence_score = imp * abs(z)
             text = evidence_text(feature, value, pct, z, imp)
-            candidates.append((score, text))
+            candidates.append((evidence_score, feature, text, value, pct, z, imp))
+
         candidates.sort(key=lambda item: item[0], reverse=True)
-        selected = [text for _, text in candidates[: args.evidence_count]]
-        selected.extend([""] * (args.evidence_count - len(selected)))
-        evidence_rows.append(selected)
+        selected = candidates[: args.evidence_count]
+        texts = [item[2] for item in selected]
+        texts.extend([""] * (args.evidence_count - len(texts)))
+        evidence_rows.append(texts)
+
+        base = {column: row[column] for column in queue_metadata}
+        for evidence_rank, item in enumerate(selected, start=1):
+            evidence_score, feature, _, value, pct, z, imp = item
+            long_rows.append(
+                {
+                    **base,
+                    "evidence_rank": evidence_rank,
+                    "feature": feature,
+                    "feature_value": value,
+                    "percentile": pct,
+                    "zscore": z,
+                    "absolute_zscore": abs(z),
+                    "global_random_forest_importance": imp,
+                    "evidence_score": evidence_score,
+                }
+            )
 
     evidence_frame = pd.DataFrame(evidence_rows, columns=evidence_columns, index=merged.index)
     output = pd.concat([merged, evidence_frame], axis=1)
@@ -141,12 +173,17 @@ def main() -> None:
     )
 
     out = Path(args.output)
+    long_out = Path(args.long_output)
     out.parent.mkdir(parents=True, exist_ok=True)
+    long_out.parent.mkdir(parents=True, exist_ok=True)
     output.to_csv(out, index=False)
+    pd.DataFrame(long_rows).to_csv(long_out, index=False)
+
     print(
         f"Wrote {out} with {args.evidence_count} case-specific evidence cues for "
         f"{len(output):,} queued components"
     )
+    print(f"Wrote structured evidence table to {long_out}")
 
 
 if __name__ == "__main__":
