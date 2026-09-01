@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import random
-from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -118,12 +117,8 @@ def main() -> None:
                 x = merge(torch.cat([forward_x, reverse_x], dim=1))
                 x = F.relu(x)
                 x = F.dropout(x, p=self.dropout, training=self.training)
-            mean_pool = global_mean_pool(
-                x, component_index, size=self.component_count
-            )
-            max_pool = global_max_pool(
-                x, component_index, size=self.component_count
-            )
+            mean_pool = global_mean_pool(x, component_index, size=self.component_count)
+            max_pool = global_max_pool(x, component_index, size=self.component_count)
             return self.head(torch.cat([mean_pool, max_pool], dim=1)).squeeze(1)
 
     def choose_device() -> str:
@@ -223,6 +218,9 @@ def main() -> None:
     score_rows: list[pd.DataFrame] = []
     split_audits: list[dict] = []
 
+    def tensor_indices(indices: np.ndarray):
+        return torch.as_tensor(indices, dtype=torch.long, device=device)
+
     def scaled_feature_tensor(component_indices: np.ndarray):
         mask = np.isin(node_component_index_np, component_indices)
         means = raw_features[mask].mean(axis=0, dtype=np.float64)
@@ -241,13 +239,14 @@ def main() -> None:
         ).to(device)
 
     def loss_for_indices(logits, indices: np.ndarray):
-        y = label_tensor[indices]
+        index_tensor = tensor_indices(indices)
+        y = label_tensor[index_tensor]
         positives = float(y.sum().item())
         negatives = float(len(indices) - positives)
         pos_weight_value = negatives / positives if positives > 0 else 1.0
         pos_weight = torch.tensor(pos_weight_value, device=device)
         return F.binary_cross_entropy_with_logits(
-            logits[indices], y, pos_weight=pos_weight
+            logits[index_tensor], y, pos_weight=pos_weight
         )
 
     @torch.no_grad()
@@ -260,7 +259,8 @@ def main() -> None:
         logits = model(
             x_tensor, edge_index, reverse_edge_index, component_index_tensor
         )
-        return torch.sigmoid(logits[indices]).detach().cpu().numpy()
+        selected = logits[tensor_indices(indices)]
+        return torch.sigmoid(selected).detach().cpu().numpy()
 
     for seed in args.seeds:
         set_seed(seed)
@@ -306,7 +306,6 @@ def main() -> None:
             }
         )
 
-        # Phase 1: use an internal validation subset only to select the epoch count.
         x_fit_scaled = scaled_feature_tensor(fit_indices)
         model = build_model()
         optimizer = torch.optim.Adam(
@@ -316,7 +315,6 @@ def main() -> None:
         )
         best_validation_ap = -np.inf
         best_epoch = 1
-        best_state = None
         stale_epochs = 0
 
         for epoch in range(1, args.max_epochs + 1):
@@ -348,19 +346,16 @@ def main() -> None:
             if validation_ap > best_validation_ap + args.min_delta:
                 best_validation_ap = validation_ap
                 best_epoch = epoch
-                best_state = deepcopy(model.state_dict())
                 stale_epochs = 0
             else:
                 stale_epochs += 1
             if stale_epochs >= args.patience:
                 break
 
-        del model, optimizer, x_fit_scaled, best_state
+        del model, optimizer, x_fit_scaled
         if device == "cuda":
             torch.cuda.empty_cache()
 
-        # Phase 2: retrain from scratch on the full 80% training split for the
-        # selected epoch count, then evaluate once on the untouched 20% test set.
         set_seed(seed)
         x_train_scaled = scaled_feature_tensor(train_indices)
         final_model = build_model()
@@ -419,7 +414,8 @@ def main() -> None:
 
         print(
             f"seed={seed} best_epoch={best_epoch} "
-            f"val_PR_AUC={best_validation_ap:.4f} test_PR_AUC={metrics['average_precision']:.4f} "
+            f"val_PR_AUC={best_validation_ap:.4f} "
+            f"test_PR_AUC={metrics['average_precision']:.4f} "
             f"test_ROC_AUC={metrics['roc_auc']:.4f}"
         )
 
@@ -449,7 +445,6 @@ def main() -> None:
         ]
         summary.to_csv(results_dir / "graph_native_metrics_summary.csv", index=False)
 
-    # Same-split comparison is only emitted when the existing seed-42 RF files exist.
     rf_metrics_path = Path("results/node_enriched/model_metrics.csv")
     rf_budgets_path = Path("results/node_enriched/review_budget_metrics.csv")
     graph_seed42 = metrics_frame.loc[metrics_frame["seed"] == 42]
@@ -513,7 +508,9 @@ def main() -> None:
             "hidden_dim": args.hidden_dim,
             "layers": args.layers,
             "dropout": args.dropout,
-            "direction_handling": "separate forward/reverse GraphSAGE channels merged per layer",
+            "direction_handling": (
+                "separate forward/reverse GraphSAGE channels merged per layer"
+            ),
             "graph_pooling": "global mean plus global max",
         },
         "seeds": args.seeds,
