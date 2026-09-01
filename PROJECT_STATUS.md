@@ -1,7 +1,7 @@
 # Project Status
 
 ## Current phase
-**Phase 4 — edge-enriched model benchmarking**
+**Phase 4 — edge-enriched benchmark validation**
 
 ### Complete
 - Dataset selection: Elliptic2.
@@ -24,49 +24,42 @@
   - random forest PR-AUC 0.024107 / ROC-AUC 0.512885;
   - logistic regression top-0.5% lift 1.8055x.
 - Background-node enrichment completed with perfect 444,521-node match integrity.
-- All 43 node features aggregated by mean, population standard deviation, minimum, and maximum into 172 component-level features.
+- All 43 node features aggregated into 172 component-level features.
 - Initial node-enriched benchmark completed:
   - logistic regression PR-AUC 0.145578 / ROC-AUC 0.882008;
   - random forest PR-AUC 0.530556 / ROC-AUC 0.926611;
   - random forest top-0.5%: 117 suspicious components in 122 reviews, 95.90% precision, 42.25x lift.
-- Five-seed repeated-split validation completed:
+- Five-seed node-only validation completed:
   - random forest PR-AUC mean 0.527917, SD 0.008117, range 0.519036–0.539170;
   - random forest ROC-AUC mean 0.927790, SD 0.004619;
-  - random forest Brier score mean 0.015044.
-- Repeated review-budget stability verified:
-  - top 0.5% precision mean 94.26%, lift mean 41.53x, suspicious captured mean 115.0 (range 112–117);
-  - top 1% precision mean 77.38%, lift mean 34.09x, suspicious captured mean 188.8.
-- Shuffled-label sanity check passed:
-  - random forest PR-AUC 0.020978 / ROC-AUC 0.486122 against 0.022699 prevalence.
-- Final node validation gate passed:
-  - repeated-split stability pass;
-  - permutation sanity pass;
-  - schema leakage audit pass;
-  - top feature importance 5.20%;
-  - top-10 cumulative importance 38.46%;
-  - feature-dominance manual review not recommended by the gate.
-- Validated node-enriched random forest promoted to the primary benchmark for the edge-feature experiment.
+  - top-0.5% precision mean 94.26%, lift mean 41.53x, suspicious captured mean 115.0;
+  - shuffled-label PR-AUC 0.020978 / ROC-AUC 0.486122 against 0.022699 prevalence;
+  - final stability, permutation, schema-leakage, and feature-dominance gates passed.
+- Validated node-enriched random forest is the primary benchmark.
 - Background-edge enrichment completed successfully on the 196.2M-row table:
   - 367,137 labeled edge rows and 367,137 distinct labeled edge keys;
-  - zero duplicate labeled edge keys;
-  - zero missing component mappings;
-  - 367,137 background matches and 367,137 distinct matched edge keys;
-  - zero missing labeled edges and zero duplicate background matches;
-  - all 95 edge features aggregated by mean, population standard deviation, minimum, and maximum;
-  - 380 component-level edge-derived features created;
+  - zero duplicate labeled keys, missing component IDs, missing labeled edges, or duplicate background matches;
+  - all 95 edge features aggregated into 380 component-level edge-derived features;
   - all 121,810 components retained, including all 2,763 suspicious components;
-  - zero components without edge-feature coverage;
-  - zero rows with null edge aggregates.
-- Edge-enriched feature store written to `data/derived/component_features_node_edge_enriched.parquet`.
+  - zero components without edge coverage and zero null edge aggregates.
+- Initial node+edge benchmark completed on the same seed-42 split:
+  - logistic regression PR-AUC 0.151296 / ROC-AUC 0.873186;
+  - random forest PR-AUC 0.487667 / ROC-AUC 0.925434.
+- Edge features do **not** improve the winning random forest on the matched split:
+  - RF PR-AUC falls from 0.530556 node-only to 0.487667 node+edge;
+  - top-0.5% suspicious captured falls from 117 to 114;
+  - top-1% suspicious captured falls from 190 to 176;
+  - top-2% suspicious captured falls from 262 to 242;
+  - ROC-AUC remains essentially flat.
+- Initial conclusion: the 95-edge-feature experiment is technically successful but adds complexity without improving the primary operational model.
 - Investigator queue selection defaults to the highest-average-precision model.
 - 3D visualization remains the project standard.
 
 ### Next
-- Train logistic regression and random forest on `data/derived/component_features_node_edge_enriched.parquet` into a separate `results/node_edge_enriched/` directory.
-- Build a separate edge-enriched investigator queue and 3D figures.
-- Compare edge-enriched PR-AUC, ROC-AUC, and review-budget lift against the validated node benchmark (RF PR-AUC mean ~0.528; top-0.5% lift mean ~41.5x).
-- If edge features materially improve the initial benchmark, run repeated-split / permutation validation using `src/validate_node_enriched_models.py --input data/derived/component_features_node_edge_enriched.parquet --results-dir results/node_edge_enriched_validation`.
-- If edge features do not materially improve results, retain the simpler validated node model as the preferred operational baseline and document the negative incremental-value finding.
+- Run repeated-split / permutation validation on `data/derived/component_features_node_edge_enriched.parquet` using the same five seeds as the validated node benchmark.
+- Write validation outputs to a separate `results/node_edge_enriched_validation/` directory.
+- Compare repeated node+edge PR-AUC, ROC-AUC, Brier score, and review-budget lift against the validated node-only benchmark.
+- If node+edge underperformance persists, formally retain the simpler node-only random forest as the preferred operational model and present the edge stage as a negative incremental-value finding.
 - Review calibration before presenting raw model scores as probabilities.
 - Add graph-native GLASS-style or equivalent benchmark when compute permits.
-- Produce portfolio-ready findings and 3D comparative visuals only from verified, validated real-data outputs.
+- Produce portfolio-ready 3D comparative visuals from the validated model-selection story: structure vs node vs node+edge.
