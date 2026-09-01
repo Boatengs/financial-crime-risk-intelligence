@@ -1,152 +1,111 @@
 # Current Findings
 
-## Verified structural baseline
+## Evaluation frame
 
-The repository has been run on the official locally downloaded Elliptic2 labeled universe. These are **project results**, not synthetic fixture metrics and not published-paper metrics.
+The project uses the locally downloaded Elliptic2 labeled universe:
+- 121,810 labeled connected components;
+- 119,047 licit and 2,763 suspicious components;
+- positive prevalence about 2.27%;
+- PR-AUC is the primary global metric because of severe class imbalance;
+- investigator-budget precision, recall, lift, and suspicious cases captured are the primary operational metrics.
 
-### Evaluation setup
-- 121,810 labeled connected components.
-- 119,047 licit and 2,763 suspicious components.
-- Positive-class prevalence: about 2.27%.
-- Primary global metric: average precision / PR-AUC because of the severe class imbalance.
+These are **project results**, not synthetic fixture metrics and not published-paper metrics.
 
-### Structural-only benchmark
+## Structural-only benchmark
 
-The structural feature store contains 19 complete engineered features for all 121,810 labeled components. Licit and suspicious components are similar on basic topology, and structure alone provides weak discrimination.
+The 19-feature structural store is complete and contains zero nulls, but basic component topology provides little discrimination.
 
-| Model | Average precision | ROC-AUC |
+| Model | PR-AUC | ROC-AUC |
 |---|---:|---:|
 | Logistic regression | 0.0263 | 0.5460 |
 | Random forest | 0.0241 | 0.5129 |
 
-For the stronger structural logistic model, the top 0.5% review budget captured 5 suspicious components in 122 reviews, with 4.10% precision and 1.81x lift versus random review.
+For the stronger structural logistic model, the top 0.5% review budget captured only 5 suspicious components in 122 reviews, with 4.10% precision and 1.81x lift.
 
 ## Validated node-enriched benchmark
 
-The 49.3M-row background-node table was joined out-of-core to the 444,521 labeled nodes with perfect match integrity:
-- 444,521 distinct labeled nodes matched exactly once;
-- zero missing labeled nodes;
-- zero duplicate background matches;
-- all 43 anonymized node features were aggregated by mean, population standard deviation, minimum, and maximum;
-- 172 node-derived component features were added;
-- all 121,810 components and all 2,763 suspicious labels were retained.
+All 444,521 labeled nodes matched exactly once against the 49.3M-row background-node table. All 43 anonymized node features were aggregated by mean, population standard deviation, minimum, and maximum, producing 172 component-level node features while retaining all 121,810 components.
 
-### Initial split
+Five stratified 80/20 splits validated the node-enriched random forest:
 
-Using the same 80/20 component-level split and modeling framework, the first node-enriched run produced:
+| Measure | Result |
+|---|---:|
+| Mean PR-AUC | 0.5279 |
+| PR-AUC SD | 0.0081 |
+| PR-AUC range | 0.5190–0.5392 |
+| Mean ROC-AUC | 0.9278 |
+| Mean Brier score | 0.0150 |
+| Top 0.5% precision | 94.26% |
+| Top 0.5% lift | 41.53x |
+| Suspicious captured in top 0.5% | 115.0 mean |
+| Suspicious captured in top 1% | 188.8 mean |
+| Suspicious captured in top 2% | 261.8 mean |
 
-| Model | Average precision | ROC-AUC | Test base rate |
-|---|---:|---:|---:|
-| Logistic regression | 0.1456 | 0.8820 | 0.0227 |
-| Random forest | 0.5306 | 0.9266 | 0.0227 |
+A shuffled-label sanity check collapsed random-forest performance to PR-AUC 0.0210 and ROC-AUC 0.4861 against a 0.0227 test prevalence. Repeated-split stability, permutation sanity, schema-leakage, and feature-dominance checks passed. The largest RF feature accounts for about 5.2% of total importance and the top 10 for about 38.5%.
 
-The random forest captured 117 suspicious components in the top 122 reviews (top 0.5%), corresponding to 95.90% precision, 21.16% recall, and 42.25x lift versus random review.
+## Edge-feature ablation
 
-### Repeated-split validation
+All 367,137 labeled edges matched exactly once against the 196.2M-row background-edge table on `(clId1, clId2, txId)`. All 95 anonymized edge features were aggregated into 380 component-level edge features with zero missing edge coverage and zero null aggregates.
 
-Five stratified 80/20 splits were run with seeds 11, 23, 42, 71, and 101.
+The engineering pipeline was successful, but the additional features did not improve the strongest model.
 
-| Model | PR-AUC mean ± SD | PR-AUC range | ROC-AUC mean ± SD | ROC-AUC range | Brier mean |
+| Measure | Node-only RF | Node+edge RF |
+|---|---:|---:|
+| Mean PR-AUC | 0.5279 | 0.5022 |
+| PR-AUC SD | 0.0081 | 0.0171 |
+| Mean ROC-AUC | 0.9278 | 0.9247 |
+| Mean Brier score | 0.0150 | 0.0157 |
+| Top 0.5% precision | 94.26% | 94.10% |
+| Top 1% suspicious captured | 188.8 | 179.2 |
+| Top 2% suspicious captured | 261.8 | 252.6 |
+| Top 5% suspicious captured | 355.6 | 344.2 |
+| Top 10% suspicious captured | 424.6 | 421.2 |
+
+The node+edge RF loses about 4.9% relative PR-AUC and is less stable across splits. The 0.5% review point is effectively tied, while node-only performs better at every larger tested review budget.
+
+**Final model-selection decision: use the node-enriched random forest.**
+
+The edge experiment is a validated negative incremental-value finding: considerably more data engineering and model dimensionality did not create more investigator value.
+
+## Held-out calibration validation
+
+Probability calibration was evaluated with a strict 60/20/20 train/calibration/test design using the preferred 192-feature node-enriched store.
+
+| Method | PR-AUC | ROC-AUC | Brier | Log loss | ECE |
 |---|---:|---:|---:|---:|---:|
-| Logistic regression | 0.1435 ± 0.0043 | 0.1385–0.1498 | 0.8808 ± 0.0030 | 0.8773–0.8853 | 0.1431 |
-| Random forest | 0.5279 ± 0.0081 | 0.5190–0.5392 | 0.9278 ± 0.0046 | 0.9220–0.9348 | 0.0150 |
+| Raw RF | 0.507435 | 0.919154 | 0.015337 | 0.072548 | 0.008812 |
+| Sigmoid | 0.507435 | 0.919154 | 0.015334 | 0.068664 | 0.002716 |
+| Isotonic | 0.481282 | 0.918349 | 0.015155 | 0.065206 | 0.001389 |
 
-The random-forest result is stable across the tested splits rather than being driven by seed 42 alone.
+Sigmoid calibration reduces ECE by about 69% relative to the raw score and improves log loss without changing PR-AUC, ROC-AUC, or any tested constrained-review result. Raw RF and sigmoid both capture 113 suspicious components in the top 122 reviews, 186 in the top 244, and 249 in the top 488.
 
-### Repeated investigator-budget validation
+Isotonic produces the best Brier score, log loss, and ECE, but it reduces PR-AUC to 0.4813 and captures only 109 suspicious components in the top 122 reviews. That trade-off is not acceptable for the primary investigator-prioritization objective.
 
-For the random forest:
+## Final score semantics
 
-| Review budget | Precision mean | Recall mean | Lift mean | Suspicious captured mean | Capture range |
-|---|---:|---:|---:|---:|---:|
-| 0.5% | 94.26% | 20.80% | 41.53x | 115.0 | 112–117 |
-| 1% | 77.38% | 34.14% | 34.09x | 188.8 | 182–194 |
-| 2% | 53.65% | 47.34% | 23.63x | 261.8 | 252–270 |
-| 5% | 29.17% | 64.30% | 12.85x | 355.6 | 347–362 |
-| 10% | 17.42% | 76.78% | 7.68x | 424.6 | 419–438 |
+The project uses two distinct outputs:
 
-The high-lift queue behavior is operationally stable across the tested random splits.
+1. **Raw RF priority score:** the operational ranking signal used to order investigator review. It is not a literal suspicious-activity probability.
+2. **Optional sigmoid-calibrated estimate:** a research probability estimate that may be used when probability-like interpretation is helpful. It remains decision support only and is not evidence of criminal activity.
 
-### Shuffled-label sanity check and final gate
+The investigator queue therefore uses **capacity-based priority tiers** rather than raw-score thresholds:
+- tier 1: top 0.5%;
+- tier 2: top 1%;
+- tier 3: top 2%;
+- tier 4: top 5%;
+- tier 5: top 10%;
+- standard: remaining cases.
 
-Training labels were permuted while the held-out test labels remained real. Random-forest performance collapsed to PR-AUC 0.0210 and ROC-AUC 0.4861 against a 0.0227 test prevalence. Repeated-split stability, permutation sanity, and schema-leakage checks all passed. Feature importance was not excessively concentrated: the top feature accounted for about 5.20% of total importance and the top 10 for about 38.46%.
+This prevents labels such as `critical` or `high` from implying an unsupported probability interpretation.
 
-The validated node-enriched random forest is therefore a credible decision-support benchmark rather than a single favorable split.
+## Current interpretation
 
-## Edge-feature enrichment
+1. Basic graph structure alone contains little useful prioritization signal.
+2. Node-derived features provide substantial, repeatable investigator value.
+3. Edge-derived aggregates add engineering cost but do not improve the winning model.
+4. The node-enriched random forest is the preferred research decision-support model.
+5. Ranking performance is the primary product requirement; sigmoid calibration is optional and does not replace the raw ranking signal.
+6. Raw model scores must not be presented as literal suspicious-activity probabilities.
+7. Scores prioritize human review only. They do not establish criminal activity, make legal determinations, or automate regulatory reporting.
 
-The 367,137 labeled edges were matched against the 196,215,606-row background-edge table using the full `(clId1, clId2, txId)` key. Match integrity passed exactly:
-- 367,137 labeled edge rows and 367,137 distinct labeled edge keys;
-- zero duplicate labeled edge keys;
-- zero missing component IDs;
-- 367,137 background matches and 367,137 distinct matched edge keys;
-- zero missing labeled edges;
-- zero duplicate background matches.
-
-All 95 anonymized edge features were aggregated by mean, population standard deviation, minimum, and maximum, yielding 380 component-level edge-derived features. The node+edge feature store retains all 121,810 components and all 2,763 suspicious labels, with zero components lacking edge-feature coverage and zero null edge aggregates.
-
-### Repeated node+edge validation
-
-Five stratified 80/20 splits were run on the node+edge feature store using the same seed set as the node-only validation.
-
-| Model | PR-AUC mean ± SD | PR-AUC range | ROC-AUC mean ± SD | Brier mean |
-|---|---:|---:|---:|---:|
-| Logistic regression | 0.1531 ± 0.0045 | 0.1471–0.1590 | 0.8773 ± 0.0041 | 0.1325 |
-| Random forest | 0.5022 ± 0.0171 | 0.4877–0.5286 | 0.9247 ± 0.0027 | 0.0157 |
-
-Edge features modestly improve logistic-regression PR-AUC relative to node-only logistic regression, but logistic regression remains materially weaker than the random forest. For the winning model family, the node+edge random forest is worse than the node-only random forest on the primary metric.
-
-### Node-only vs node+edge random forest
-
-| Measure | Node-only RF | Node+edge RF | Direction |
-|---|---:|---:|---|
-| Mean PR-AUC | 0.5279 | 0.5022 | Worse with edges |
-| PR-AUC SD | 0.0081 | 0.0171 | Less stable with edges |
-| Mean ROC-AUC | 0.9278 | 0.9247 | Slightly worse with edges |
-| Mean Brier score | 0.0150 | 0.0157 | Slightly worse with edges |
-| Top 0.5% precision | 94.26% | 94.10% | Essentially tied |
-| Top 0.5% suspicious captured | 115.0 | 114.8 | Essentially tied |
-| Top 1% precision | 77.38% | 73.44% | Worse with edges |
-| Top 1% suspicious captured | 188.8 | 179.2 | Worse with edges |
-| Top 2% precision | 53.65% | 51.76% | Worse with edges |
-| Top 2% suspicious captured | 261.8 | 252.6 | Worse with edges |
-| Top 5% suspicious captured | 355.6 | 344.2 | Worse with edges |
-| Top 10% suspicious captured | 424.6 | 421.2 | Worse with edges |
-
-Mean node+edge RF PR-AUC is about 0.0257 lower than node-only, a relative degradation of roughly 4.9%. The 0.5% review point is effectively tied, but node-only is better at every larger tested review budget. The edge-enriched random forest is also less stable across splits and has a slightly worse Brier score.
-
-## Final model-selection decision
-
-**Preferred research decision-support model: node-enriched random forest.**
-
-This choice is supported by three considerations:
-1. **Predictive value:** the node-only random forest has the highest validated PR-AUC.
-2. **Operational value:** it captures more suspicious components at 1%, 2%, 5%, and 10% review budgets while matching the edge model at 0.5%.
-3. **Parsimony and engineering cost:** the edge stage required scanning 196.2M rows and adding 380 features but did not improve the strongest model.
-
-The edge experiment is therefore a validated negative incremental-value result: more data and more features did not automatically create more investigator value. This is an important engineering and model-governance conclusion, not a failed experiment.
-
-## Raw-score calibration diagnostic
-
-The seed-42 node-only random-forest reliability table shows that the raw score is useful for ranking but should not yet be presented as a literal suspicious-activity probability.
-
-The 10 equal-width score bins show:
-- in the lowest `(0.0, 0.1]` band, 22,873 cases have a mean score of about 1.42% and an observed suspicious rate of about 0.78%, so the model is mildly over-confident at the low end;
-- in the `(0.5, 0.6]` band, the mean score is about 54.2% while the observed suspicious rate is 77.8%;
-- in the `(0.6, 0.7]` band, the mean score is about 64.4% while the observed suspicious rate is 90.9%;
-- the `(0.8, 0.9]` and `(0.9, 1.0]` bands are 100% suspicious in this held-out split, but contain only 31 and 37 cases respectively.
-
-The weighted 10-bin expected calibration error from this table is about 0.009, so aggregate calibration is not poor. However, calibration error is uneven across the score range and the high-score bins are small. That makes probability language too strong even though the ranking signal is excellent.
-
-`src/validate_rf_calibration.py` therefore evaluates the preferred node-only random forest on a fully held-out 60/20/20 train/calibration/test design. It compares the raw score with sigmoid (Platt-style) and isotonic calibration and reports Brier score, log loss, ECE, PR-AUC, ROC-AUC, and constrained-review metrics.
-
-### Current interpretation
-1. Basic connected-component structure contains limited risk signal.
-2. The anonymized node features add substantial, repeatable predictive signal, especially for the nonlinear random forest.
-3. The node-only random forest remains strong across repeated splits and constrained review budgets.
-4. The edge feature pipeline is technically correct but does not improve the preferred random forest and makes it less stable on PR-AUC.
-5. The preferred model should therefore retain structural + node-derived features and exclude the 380 edge aggregates from the operational baseline.
-6. Raw random-forest outputs should remain ranking scores unless the held-out calibration experiment supports a calibrated probability layer.
-7. Scores do not establish criminal activity, make legal determinations, or automate regulatory reporting.
-
-The next project stage should evaluate held-out calibration, generate final 3D model-selection and calibration visuals, harden investigator-facing explanation outputs, and keep any graph-native benchmark clearly separated from the validated feature-engineered baseline.
+The remaining product-hardening work is to regenerate the final queue with capacity-based tiers, create final 3D model-selection/calibration visuals, and replace placeholder reason text with case-specific evidence-based explanations that do not over-interpret anonymized source features.
