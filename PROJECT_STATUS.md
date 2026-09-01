@@ -1,7 +1,7 @@
 # Project Status
 
 ## Current phase
-**Phase 6 — graph-native benchmark**
+**Phase 6 — graph-native benchmark complete**
 
 ### Complete
 - Dataset: Elliptic2.
@@ -80,30 +80,39 @@
   - README rewritten around verified results and decision value;
   - Financial Crime Risk Intelligence added as Project 13 in the portfolio work index;
   - portfolio GitHub Pages deployment passed.
-- Graph-native benchmark scaffold added:
-  - `src/prepare_graph_native_dataset.py` prepares a compact labeled-subgraph graph dataset from 444,521 labeled nodes, 367,137 labeled edges, 121,810 components, and 43 node features;
-  - preparation scans `background_nodes.csv` once and does not scan `background_edges.csv`;
-  - `src/train_graph_native_baseline.py` implements a directed dual-channel GraphSAGE graph classifier with global mean + max pooling;
-  - seed 42 must exactly match the existing node-enriched RF test component set before evaluation;
-  - the internal validation subset selects the training epoch count, after which the graph model is retrained on the full 80% training split;
-  - graph results use the same PR-AUC and constrained-review metrics as the feature-engineered benchmark;
-  - `reports/GRAPH_NATIVE_BENCHMARK.md` documents scope, controls, and the separation from published GLASS results.
+- Graph-native dataset preparation completed:
+  - 444,521 labeled nodes matched exactly once to the 43 node features;
+  - 367,137 labeled edges retained;
+  - zero missing source/target nodes, zero cross-component edges, zero null labels;
+  - 121,810 components retained, including 2,763 positives;
+  - the compact benchmark does not rescan or use the 196.2M-row background edge graph.
+- Directed GraphSAGE benchmark completed on the exact seed-42 RF test components:
+  - selected epoch 18 from internal validation;
+  - validation PR-AUC 0.244746;
+  - test PR-AUC 0.249817 versus RF 0.530556;
+  - test ROC-AUC 0.870199 versus RF 0.926611;
+  - GraphSAGE PR-AUC is 52.9% lower than the RF on the matched test set;
+  - at the top 0.5% review budget, GraphSAGE captures 72 suspicious components versus 117 for RF;
+  - GraphSAGE captures fewer suspicious components at every tested review budget from 0.5% through 10%;
+  - the graph-native model is retained as a validated negative-complexity benchmark rather than promoted to repeated-seed model selection.
+- `reports/GRAPH_NATIVE_BENCHMARK.md` now records the completed graph result and preserves separation from published GLASS metrics.
+- `src/generate_graph_native_figures.py` generates paired Seaborn PNG and Plotly HTML comparisons for model quality, suspicious capture, and review lift.
 
 ### Current operational interpretation
+- **The node-enriched random forest remains the final preferred investigator-ranking model.**
 - Structural features alone carry little useful AML prioritization signal.
-- Node-derived features provide the dominant validated signal in the feature-engineered models.
+- Node-derived aggregate features provide the dominant validated signal.
 - Edge-derived component aggregates add major engineering cost without improving the strongest model.
+- Directed GraphSAGE adds graph-model complexity but materially underperforms the RF on the exact matched seed-42 test set.
+- The graph-native result is useful negative evidence: more model complexity does not automatically create more investigator value.
 - Ranking quality matters more than probability calibration for the primary investigator-queue use case.
-- Raw scores must not be described as literal suspicious-activity probabilities.
+- Raw RF scores must not be described as literal suspicious-activity probabilities.
 - Case-level evidence should describe statistical feature extremeness and global model importance, not invent meanings for anonymized features.
-- Global feature importance and case-specific evidence are distinct concepts and should not be presented as causal explanations.
 - Scores and evidence prioritize human review only; they do not establish criminal activity, make legal determinations, or automate regulatory reporting.
-- The new GraphSAGE experiment is an internal labeled-subgraph benchmark, not a full-background-graph GLASS reproduction.
 - Published GLASS metrics remain external reference numbers because graph scope, split procedure, and feature usage differ.
 
 ### Next
-- Install the optional graph dependencies with `pip install -e '.[graph]'`.
-- Run `src/prepare_graph_native_dataset.py --raw-dir data/raw/elliptic2` and verify perfect graph-dataset integrity.
-- Run the seed-42 GraphSAGE benchmark and compare PR-AUC plus investigator-budget capture against the exact same RF test components.
-- If seed 42 is competitive, repeat the graph benchmark on seeds 11, 23, 42, 71, and 101 before reconsidering the preferred model.
-- Keep a true full-background-graph GLASS reproduction as a separate future benchmark because it requires the 49.3M-node / 196.2M-edge graph context.
+- Pull the completed graph-benchmark documentation and figure generator.
+- Generate and inspect the final Seaborn/Plotly graph benchmark visuals.
+- Fold the completed graph-native negative result into the README and portfolio case study.
+- Treat any future full-background-graph GLASS reproduction as an optional research extension, not a blocker for the current project.
