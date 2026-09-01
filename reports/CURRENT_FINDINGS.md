@@ -7,40 +7,21 @@ The repository has been run on the official locally downloaded Elliptic2 labeled
 ### Evaluation setup
 - 121,810 labeled connected components.
 - 119,047 licit and 2,763 suspicious components.
-- Stratified 80/20 train/test split with random state 42.
-- Positive-class rate in the held-out test set: 0.0226993 (about 2.27%).
+- Positive-class prevalence: about 2.27%.
 - Primary global metric: average precision / PR-AUC because of the severe class imbalance.
 
-### Structural feature-store validation
-The structural feature store contains 19 engineered features for all 121,810 labeled components, with zero null labels and zero null feature values.
+### Structural-only benchmark
 
-The class-level structural summaries are notably similar:
+The structural feature store contains 19 complete engineered features for all 121,810 labeled components. Licit and suspicious components are similar on basic topology, and structure alone provides weak discrimination.
 
-| Structural measure | Licit | Suspicious |
+| Model | Average precision | ROC-AUC |
 |---|---:|---:|
-| Average node count | 3.6461 | 3.7879 |
-| Median node count | 3.0 | 3.0 |
-| Average edge count | 3.0138 | 3.0232 |
-| Median edge count | 2.0 | 2.0 |
-| Average edges per node | 0.7234 | 0.7134 |
-| Average directed density | 0.3792 | 0.3613 |
-| Average source nodes | 1.0644 | 1.0575 |
-| Average sink nodes | 1.1700 | 1.1922 |
-
-Suspicious components are slightly larger on average but do not exhibit a large separation from licit components on these basic topology measures.
-
-### Structural-only discrimination
-
-| Model | Average precision | ROC-AUC | Test base rate |
-|---|---:|---:|---:|
-| Logistic regression | 0.0263 | 0.5460 | 0.0227 |
-| Random forest | 0.0241 | 0.5129 | 0.0227 |
+| Logistic regression | 0.0263 | 0.5460 |
+| Random forest | 0.0241 | 0.5129 |
 
 For the stronger structural logistic model, the top 0.5% review budget captured 5 suspicious components in 122 reviews, with 4.10% precision and 1.81x lift versus random review.
 
-The structural-only signal is weak and serves as the benchmark to beat.
-
-## Provisional node-enriched benchmark
+## Validated node-enriched benchmark
 
 The 49.3M-row background-node table was joined out-of-core to the 444,521 labeled nodes with perfect match integrity:
 - 444,521 distinct labeled nodes matched exactly once;
@@ -50,33 +31,59 @@ The 49.3M-row background-node table was joined out-of-core to the 444,521 labele
 - 172 node-derived component features were added;
 - all 121,810 components and all 2,763 suspicious labels were retained.
 
-Using the same 80/20 split and modeling framework, the first node-enriched run produced:
+### Initial split
+
+Using the same 80/20 component-level split and modeling framework, the first node-enriched run produced:
 
 | Model | Average precision | ROC-AUC | Test base rate |
 |---|---:|---:|---:|
 | Logistic regression | 0.1456 | 0.8820 | 0.0227 |
 | Random forest | 0.5306 | 0.9266 | 0.0227 |
 
-The random forest result is dramatically stronger than the structural baseline. At the top 0.5% review budget it captured 117 suspicious components in 122 reviews, corresponding to 95.90% precision, 21.16% recall, and 42.25x lift versus random review. At the top 1% it captured 190 suspicious components in 244 reviews, with 77.87% precision and 34.36% recall.
+The random forest captured 117 suspicious components in the top 122 reviews (top 0.5%), corresponding to 95.90% precision, 21.16% recall, and 42.25x lift versus random review.
 
-### Validation status
+### Repeated-split validation
 
-These node-enriched metrics are **provisional until stress-tested**. The magnitude of the improvement is large enough that the project will not treat the single-split result as portfolio-grade evidence yet.
+Five stratified 80/20 splits were run with seeds 11, 23, 42, 71, and 101.
 
-Before adding the 95 edge features or publishing headline claims, the repository requires:
-1. repeated stratified train/test splits across multiple seeds;
-2. a shuffled-label sanity check that should collapse performance toward the class prevalence;
-3. feature-name and feature-value leakage audits;
-4. feature-stability / dominant-feature inspection;
-5. calibration diagnostics and review-budget stability across splits.
+| Model | PR-AUC mean ± SD | PR-AUC range | ROC-AUC mean ± SD | ROC-AUC range | Brier mean |
+|---|---:|---:|---:|---:|---:|
+| Logistic regression | 0.1435 ± 0.0043 | 0.1385–0.1498 | 0.8808 ± 0.0030 | 0.8773–0.8853 | 0.1431 |
+| Random forest | 0.5279 ± 0.0081 | 0.5190–0.5392 | 0.9278 ± 0.0046 | 0.9220–0.9348 | 0.0150 |
 
-`src/validate_node_enriched_models.py` implements this validation stage and writes all outputs to `results/node_enriched_validation/`.
+The random-forest result is stable across the tested splits rather than being driven by seed 42 alone.
+
+### Repeated investigator-budget validation
+
+For the random forest:
+
+| Review budget | Precision mean | Recall mean | Lift mean | Suspicious captured mean | Capture range |
+|---|---:|---:|---:|---:|---:|
+| 0.5% | 94.26% | 20.80% | 41.53x | 115.0 | 112–117 |
+| 1% | 77.38% | 34.14% | 34.09x | 188.8 | 182–194 |
+| 2% | 53.65% | 47.34% | 23.63x | 261.8 | 252–270 |
+| 5% | 29.17% | 64.30% | 12.85x | 355.6 | 347–362 |
+| 10% | 17.42% | 76.78% | 7.68x | 424.6 | 419–438 |
+
+The high-lift queue behavior is therefore operationally stable across the tested random splits.
+
+### Shuffled-label sanity check
+
+Training labels were permuted while the held-out test labels remained real. Performance collapsed as expected:
+
+| Model | Permuted-label PR-AUC | Permuted-label ROC-AUC | Test base rate |
+|---|---:|---:|---:|
+| Logistic regression | 0.0245 | 0.4990 | 0.0227 |
+| Random forest | 0.0210 | 0.4861 | 0.0227 |
+
+This collapse toward prevalence / chance discrimination is strong evidence that the validated node-enriched performance depends on the real feature-label relationship rather than surviving arbitrary labels.
 
 ### Current interpretation
 1. Basic connected-component structure contains limited risk signal.
-2. The anonymized node features appear to contain substantial incremental signal, especially for the nonlinear random-forest model.
-3. The random-forest gain is large enough that validation is now more important than immediately adding more features.
-4. If repeated-split and permutation checks confirm the signal, the node-enriched model becomes the primary benchmark for the later 95-edge-feature experiment.
-5. Scores are research prioritization signals only. They do not establish criminal activity, make legal determinations, or automate regulatory reporting.
+2. The anonymized node features add substantial, repeatable predictive signal, especially for the nonlinear random forest.
+3. Random-forest PR-AUC is stable around 0.528 across five splits and review-budget lift remains very high at constrained investigator capacity.
+4. The shuffled-label sanity check behaves correctly, materially increasing confidence in the result.
+5. A final feature-dominance / target-proxy review remains appropriate because the node features are anonymized and the performance gain is large.
+6. Raw scores remain research prioritization signals. They do not establish criminal activity, make legal determinations, or automate regulatory reporting.
 
-No final portfolio claim should be made from the single-split node-enriched result alone.
+The validated node-enriched random forest is now the primary project benchmark for the later 95-edge-feature experiment, subject to the final feature-dominance audit.
