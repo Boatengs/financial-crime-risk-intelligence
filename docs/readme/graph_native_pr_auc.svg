@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="520" viewBox="0 0 960 520" role="img" aria-labelledby="title desc">
+  <title id="title">Matched seed-42 PR-AUC comparison between random forest and GraphSAGE</title>
+  <desc id="desc">On the exact same held-out seed-42 components, the node-enriched random forest achieved PR-AUC 0.5306 and directed GraphSAGE achieved 0.2498.</desc>
+  <rect width="960" height="520" fill="#ffffff"/>
+  <text x="70" y="48" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#111827">Graph-native benchmark: matched seed-42 PR-AUC</text>
+  <text x="70" y="78" font-family="Arial, sans-serif" font-size="15" fill="#4b5563">Exact same held-out component IDs · higher is better</text>
+  <line x1="120" y1="425" x2="880" y2="425" stroke="#9ca3af"/>
+  <line x1="120" y1="125" x2="120" y2="425" stroke="#9ca3af"/>
+  <g stroke="#e5e7eb"><line x1="120" y1="375" x2="880" y2="375"/><line x1="120" y1="325" x2="880" y2="325"/><line x1="120" y1="275" x2="880" y2="275"/><line x1="120" y1="225" x2="880" y2="225"/><line x1="120" y1="175" x2="880" y2="175"/><line x1="120" y1="125" x2="880" y2="125"/></g>
+  <g font-family="Arial, sans-serif" font-size="13" fill="#6b7280" text-anchor="end">
+    <text x="108" y="429">0.0</text><text x="108" y="379">0.1</text><text x="108" y="329">0.2</text><text x="108" y="279">0.3</text><text x="108" y="229">0.4</text><text x="108" y="179">0.5</text><text x="108" y="129">0.6</text>
+  </g>
+  <rect x="230" y="160" width="190" height="265" rx="10" fill="#7c3aed"/>
+  <rect x="540" y="300" width="190" height="125" rx="10" fill="#94a3b8"/>
+  <g font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#111827" text-anchor="middle">
+    <text x="325" y="143">0.5306</text><text x="635" y="283">0.2498</text>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="15" fill="#374151" text-anchor="middle">
+    <text x="325" y="456">Node-enriched RF</text><text x="635" y="456">Directed GraphSAGE</text>
+  </g>
+  <text x="495" y="492" font-family="Arial, sans-serif" font-size="13" fill="#6b7280" text-anchor="middle">GraphSAGE PR-AUC was 52.9% lower in this internal labeled-subgraph benchmark</text>
+</svg>
