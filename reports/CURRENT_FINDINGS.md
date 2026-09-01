@@ -94,10 +94,22 @@ The strongest class-separation signals are concentrated around anonymized node f
 2. The anonymized node features add substantial and repeatable predictive signal, especially for the nonlinear random forest.
 3. Random-forest PR-AUC is stable around 0.528 across five splits, and review-budget lift remains very high at constrained investigator capacity.
 4. Shuffled-label performance collapses to chance, schema leakage checks pass, and no single feature dominates the forest.
-5. The validated node-enriched random forest is now the primary project benchmark for the 95-edge-feature experiment.
+5. The validated node-enriched random forest is the primary project benchmark for the edge-feature experiment.
 6. Raw model scores remain ranking signals rather than calibrated probabilities until calibration is explicitly validated.
 7. Scores do not establish criminal activity, make legal determinations, or automate regulatory reporting.
 
-## Next experiment: edge-feature enrichment
+## Edge-feature enrichment: engineering validation complete
 
-The next stage matches the 367,137 labeled edges to the 196,215,606-row background-edge table using the full `(clId1, clId2, txId)` key. All 95 anonymized edge features will be aggregated by mean, population standard deviation, minimum, and maximum, producing 380 component-level edge-derived features. Match integrity must pass before any edge-enriched model is trained.
+The 367,137 labeled edges were matched against the 196,215,606-row background-edge table using the full `(clId1, clId2, txId)` key. The audit passed exactly:
+- 367,137 labeled edge rows and 367,137 distinct labeled edge keys;
+- zero duplicate labeled edge keys;
+- zero missing component IDs;
+- 367,137 background matches and 367,137 distinct matched edge keys;
+- zero missing labeled edges;
+- zero duplicate background matches.
+
+All 95 anonymized edge features were aggregated by mean, population standard deviation, minimum, and maximum, yielding 380 component-level edge-derived features. The node+edge feature store retains all 121,810 components and all 2,763 suspicious labels, with zero components lacking edge-feature coverage and zero null edge aggregates.
+
+This means the edge-enriched dataset is technically valid for modeling. The next question is not data integrity but incremental value: whether the 380 edge-derived features improve PR-AUC and constrained-review lift beyond the validated node benchmark, or simply add model complexity.
+
+No edge-enriched performance claim is reported yet.
